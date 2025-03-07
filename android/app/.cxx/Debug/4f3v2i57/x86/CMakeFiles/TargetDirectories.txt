@@ -1,0 +1,2 @@
+D:/project 1.0/Recipeasy-main_project/android/app/.cxx/Debug/4f3v2i57/x86/CMakeFiles/edit_cache.dir
+D:/project 1.0/Recipeasy-main_project/android/app/.cxx/Debug/4f3v2i57/x86/CMakeFiles/rebuild_cache.dir

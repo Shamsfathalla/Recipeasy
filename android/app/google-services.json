@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "937090984925",
+    "project_id": "recipeasy-17e89",
+    "storage_bucket": "recipeasy-17e89.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:937090984925:android:b387456a44ec057601a434",
+        "android_client_info": {
+          "package_name": "com.example.recipeasy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3L1xiHx_eB1fTEzqoRNAGQLCrOMQh6Rs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

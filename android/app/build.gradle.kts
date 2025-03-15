@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.recipeasy"
-    compileSdk = 34
+    compileSdk = 35
 
     ndkVersion = flutter.ndkVersion
 

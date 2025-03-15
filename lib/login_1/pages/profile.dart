@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:recipeasy/login_1/pages/settings.dart';
-import '../auth.dart';
+import '../auth.dart'; // Import Auth class
+import 'settings.dart'; // Import SettingsPage
 
 class ProfilePage extends StatelessWidget {
-  final User? user;
+  final User user;
 
-  const ProfilePage({super.key, required this.user});
+  const ProfilePage({Key? key, required this.user}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +30,8 @@ class ProfilePage extends StatelessWidget {
           children: [
             _buildProfileHeader(),
             _buildStatsRow(),
-            _buildSettingsSection(context), // Pass context here
+            _buildFriendsSection(),
+            _buildSettingsSection(context),
             _buildSignOutButton(context),
           ],
         ),
@@ -61,7 +62,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            user?.displayName ?? 'User Name',
+            user.displayName ?? 'User Name',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -70,7 +71,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            user?.email ?? 'No email provided',
+            user.email ?? 'No email provided',
             style: const TextStyle(
               fontSize: 16,
               color: Colors.white70,
@@ -87,9 +88,8 @@ class ProfilePage extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatCard('Saved Recipes', '24'),
-          _buildStatCard('Meal Plans', '5'),
-          _buildStatCard('Following', '136'),
+          _buildStatCard('Friends', '136'), // Friends stat
+          _buildStatCard('Following', '56'), // Following stat
         ],
       ),
     );
@@ -127,9 +127,93 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Widget _buildFriendsSection() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Friends',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildFriendList(),
+          const SizedBox(height: 10),
+          _buildAddFriendButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFriendList() {
+    // Replace with your actual list of friends
+    final List<String> friends = [
+      'Alice',
+      'Bob',
+      'Charlie',
+      'Diana',
+      'Eve',
+    ];
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: friends.length,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Colors.orangeAccent,
+              child: Icon(Icons.person, color: Colors.white),
+            ),
+            title: Text(friends[index]),
+            trailing: IconButton(
+              icon: const Icon(Icons.remove_circle, color: Colors.red),
+              onPressed: () {
+                // Add functionality to remove friend
+                _removeFriend(friends[index]);
+              },
+            ),
+            onTap: () {
+              // Add functionality to view friend's profile
+              _viewFriendProfile(friends[index]);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAddFriendButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Friend'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.deepOrange,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onPressed: () {
+          // Add functionality to add a friend
+          _addFriend();
+        },
+      ),
+    );
+  }
+
   Widget _buildSettingsSection(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Card(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
@@ -137,35 +221,15 @@ class ProfilePage extends StatelessWidget {
         elevation: 4,
         child: Column(
           children: [
-            _buildSettingsTile(
-              Icons.bookmark,
-              'Saved Recipes',
-                  () {
-                // Add navigation for Saved Recipes
-              },
-            ),
-            const Divider(height: 1),
-            _buildSettingsTile(
-              Icons.shopping_cart,
-              'Grocery List',
-                  () {
-                // Add navigation for Grocery List
-              },
-            ),
-            const Divider(height: 1),
-            _buildSettingsTile(
-              Icons.settings,
-              'Account Settings',
-                  () {
-                // Navigate to SettingsPage
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SettingsPage(user: user!),
-                  ),
-                );
-              },
-            ),
+            _buildSettingsTile(Icons.settings, 'Account Settings', () {
+              // Navigate to SettingsPage
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingsPage(user: user),
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -198,10 +262,25 @@ class ProfilePage extends StatelessWidget {
             ),
           ),
           onPressed: () {
-            Auth().signOut();
+            Auth().signOut(); // Ensure Auth class is imported
           },
         ),
       ),
     );
+  }
+
+  void _addFriend() {
+    // Implement logic to add a friend
+    print('Add Friend');
+  }
+
+  void _removeFriend(String friendName) {
+    // Implement logic to remove a friend
+    print('Removed $friendName');
+  }
+
+  void _viewFriendProfile(String friendName) {
+    // Implement logic to view friend's profile
+    print('View $friendName\'s profile');
   }
 }

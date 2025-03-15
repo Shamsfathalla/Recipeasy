@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../auth.dart';
 import 'profile.dart';
 import 'settings.dart';
+import 'recipes.dart'; // Import the new RecipesPage
 
 class HomeScreen extends StatefulWidget {
   final User? user;
@@ -24,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _pages.addAll([
       _HomeContent(user: widget.user!),
+      RecipesPage(), // Add RecipesPage
       ProfilePage(user: widget.user!),
       SettingsPage(user: widget.user!),
     ]);
@@ -63,6 +65,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant_menu),
+            label: 'Recipes',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

@@ -1,0 +1,2 @@
+C:/Users/shams/flutter_projects/recipeasy/android/app/.cxx/Debug/5yl3u262/x86/CMakeFiles/edit_cache.dir
+C:/Users/shams/flutter_projects/recipeasy/android/app/.cxx/Debug/5yl3u262/x86/CMakeFiles/rebuild_cache.dir

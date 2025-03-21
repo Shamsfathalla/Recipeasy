@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'auth.dart'; // Import your Auth class
 import 'pages/login_register_page.dart'; // Import the LoginPage
 import 'pages/home_page.dart'; // Import the HomePage
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Ensures proper Firebase initialization
@@ -13,7 +14,6 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final Auth _auth = Auth(); // Create an instance of your Auth class
-
   MyApp({Key? key}) : super(key: key);
 
   @override

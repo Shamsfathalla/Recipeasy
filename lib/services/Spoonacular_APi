@@ -1,0 +1,75 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:recipe_app/models/meal_plan.dart';
+import 'package:recipe_app/models/recipe.dart';
+import 'package:recipe_app/models/meal_model.dart;
+
+class SpoonacularService {
+  final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65';
+  final String _baseUrl = 'https://api.spoonacular.com';
+
+   Future<List<dynamic>> searchRecipes(String query) async {
+    final url = Uri.parse('$_baseUrl/recipes/complexSearch?query=$query&apiKey=$_apiKey');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['results']; // Returns a list of recipes
+    } else {
+      throw Exception('Failed to fetch recipes: ${response.statusCode}');
+    }
+  }
+
+  // Fetch recipe details by ID
+  Future<Map<String, dynamic>> getRecipeDetails(int recipeId) async {
+    final url = Uri.parse('$_baseUrl/recipes/$recipeId/information?apiKey=$_apiKey');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to fetch recipe details: ${response.statusCode}');
+    }
+  }
+
+  // Fetch random recipes
+  Future<List<dynamic>> getRandomRecipes() async {
+    final url = Uri.parse('$_baseUrl/recipes/random?apiKey=$_apiKey');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['recipes']; // Returns a list of recipes
+    } else {
+      throw Exception('Failed to fetch random recipes: ${response.statusCode}');
+    }
+  }
+
+  // Generate meal plan
+  Future<MealPlan> generateMealPlan({int targetCalories, String diet}) async {
+    if (diet == 'None') diet = '';
+    Map<String, String> parameters = {
+      'timeFrame': 'day',
+      'targetCalories': targetCalories.toString(),
+      'diet': diet,
+      'apiKey': API_KEY,
+    };
+    Uri uri = Uri.https(
+      _baseUrl,
+      '/recipes/mealplans/generate',
+      parameters,
+    );
+    Map<String, String> headers = {
+      HttpHeaders.contentTypeHeader: 'application/json',
+    };
+
+    try {
+      var response = await http.get(uri, headers: headers);
+      Map<String, dynamic> data = json.decode(response.body);
+      MealPlan mealPlan = MealPlan.fromMap(data);
+      return mealPlan;
+    } catch (err) {
+      throw err.toString();
+    }
+  }
+}

@@ -221,7 +221,7 @@ class HomeContent extends StatelessWidget {
   final List<dynamic> exploreRecipes;
   final bool isLoading;
   final TextEditingController searchController;
-  final bool isSearching; // New parameter to track search state
+  final bool isSearching;
 
   const HomeContent({
     super.key,
@@ -232,7 +232,7 @@ class HomeContent extends StatelessWidget {
     required this.searchController,
     required this.exploreRecipes,
     required this.fetchRandomRecipes,
-    required this.isSearching, // Add this parameter
+    required this.isSearching,
   });
 
   @override
@@ -241,8 +241,10 @@ class HomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
+          // Search Bar with Search Icon Inside and Filter Button Outside
           Row(
             children: [
+              // Expanded Search Bar with Search Icon Inside
               Expanded(
                 child: TextField(
                   controller: searchController,
@@ -251,16 +253,28 @@ class HomeContent extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10.0),
                     ),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey), // Search icon inside the bar
+                    suffixIcon: searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        searchController.clear();
+                        clearSearch();
+                      },
+                    ),
                   ),
+                  onSubmitted: (query) {
+                    searchRecipes(query);
+                  },
                 ),
               ),
+              // Filter Button Outside Search Bar
               IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () => searchRecipes(searchController.text),
-              ),
-              IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () => clearSearch(),
+                icon: const Icon(Icons.filter_list),
+                onPressed: () {
+                  // Add filter functionality here later
+                },
               ),
             ],
           ),
@@ -275,6 +289,13 @@ class HomeContent extends StatelessWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
+                    // Filter Button next to Refresh
+                    IconButton(
+                      icon: const Icon(Icons.filter_list),
+                      onPressed: () {
+                        // Add filter functionality here later
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.refresh),
                       onPressed: () => fetchRandomRecipes(),

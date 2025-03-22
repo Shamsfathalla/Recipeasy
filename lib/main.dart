@@ -4,11 +4,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'auth.dart'; // Import your Auth class
 import 'pages/login_register_page.dart'; // Import the LoginPage
 import 'pages/home_page.dart'; // Import the HomePage
-import 'firebase_options.dart';
+import 'firebase_options.dart'; // Import Firebase options
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensures proper Firebase initialization
-  await Firebase.initializeApp(); // Initialize Firebase
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // Ensures correct platform settings
+  );
   runApp(MyApp());
 }
 

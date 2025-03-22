@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:recipeasy/models/meal_planning.dart';
 import 'package:recipeasy/models/recipe.dart';
@@ -9,18 +8,19 @@ class SpoonacularService {
   final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65';
   final String _baseUrl = 'https://api.spoonacular.com';
 
-  Future<List<dynamic>> searchRecipes(String query) async {
+   Future<List<dynamic>> searchRecipes(String query) async {
     final url = Uri.parse('$_baseUrl/recipes/complexSearch?query=$query&apiKey=$_apiKey');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['results'];
+      return data['results']; // Returns a list of recipes
     } else {
       throw Exception('Failed to fetch recipes: ${response.statusCode}');
     }
   }
 
+  // Fetch recipe details by ID
   Future<Map<String, dynamic>> getRecipeDetails(int recipeId) async {
     final url = Uri.parse('$_baseUrl/recipes/$recipeId/information?apiKey=$_apiKey');
     final response = await http.get(url);
@@ -32,45 +32,44 @@ class SpoonacularService {
     }
   }
 
+  // Fetch random recipes
   Future<List<dynamic>> getRandomRecipes() async {
-    // Fetch 10 random recipes
-    final url = Uri.parse('$_baseUrl/recipes/random?number=10&apiKey=$_apiKey');
+    final url = Uri.parse('$_baseUrl/recipes/random?apiKey=$_apiKey');
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['recipes'];
+      return data['recipes']; // Returns a list of recipes
     } else {
       throw Exception('Failed to fetch random recipes: ${response.statusCode}');
     }
   }
 
-  Future<MealPlan> generateMealPlan({required int targetCalories, required String diet}) async {
+  // Generate meal plan
+  Future<MealPlan> generateMealPlan({int targetCalories, String diet}) async {
     if (diet == 'None') diet = '';
-
     Map<String, String> parameters = {
       'timeFrame': 'day',
       'targetCalories': targetCalories.toString(),
       'diet': diet,
-      'apiKey': _apiKey,
+      'apiKey': API_KEY,
     };
-
-    Uri uri = Uri.parse('$_baseUrl/recipes/mealplans/generate').replace(queryParameters: parameters);
-
+    Uri uri = Uri.https(
+      _baseUrl,
+      '/recipes/mealplans/generate',
+      parameters,
+    );
     Map<String, String> headers = {
       HttpHeaders.contentTypeHeader: 'application/json',
     };
 
     try {
       var response = await http.get(uri, headers: headers);
-      if (response.statusCode == 200) {
-        Map<String, dynamic> data = json.decode(response.body);
-        return MealPlan.fromMap(data);
-      } else {
-        throw Exception('Failed to generate meal plan: ${response.statusCode}');
-      }
+      Map<String, dynamic> data = json.decode(response.body);
+      MealPlan mealPlan = MealPlan.fromMap(data);
+      return mealPlan;
     } catch (err) {
-      throw Exception('Error generating meal plan: $err');
+      throw err.toString();
     }
   }
 }

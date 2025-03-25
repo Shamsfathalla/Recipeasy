@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:recipeasy/pages/recipe_details.dart';
 import '/auth.dart';
 import '/pages/profile_page.dart';
 import '/pages/shoplist_page.dart';
@@ -55,27 +56,29 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _searchRecipes(String query) async {
-    if (query.isEmpty) return;
+void _searchRecipes(String query, {bool byIngredients = false}) async {
+  if (query.isEmpty) return;
 
+  setState(() {
+    _isLoading = true;
+    _isSearching = true; // Set search state to true
+  });
+
+  try {
+    final recipes = byIngredients
+        ? await _spoonacularService.searchRecipesByIngredients(query)
+        : await _spoonacularService.searchRecipes(query);
     setState(() {
-      _isLoading = true;
-      _isSearching = true; // Set search state to true
+      _recipes = recipes;
     });
-
-    try {
-      final recipes = await _spoonacularService.searchRecipes(query);
-      setState(() {
-        _recipes = recipes;
-      });
-    } catch (e) {
-      print('Error: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  } catch (e) {
+    print('Error: $e');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 
   void _clearSearch() {
     setState(() {
@@ -306,38 +309,58 @@ class HomeContent extends StatelessWidget {
               ],
             ),
           Expanded(
-            child: isLoading
-                ? const Center(
+      child: isLoading
+          ? const Center(
               child: CircularProgressIndicator(),
             )
-                : recipes.isEmpty
-                ? ListView.builder(
-              itemCount: exploreRecipes.length,
-              itemBuilder: (context, index) {
-                final recipe = exploreRecipes[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListTile(
-                    title: Text(recipe['title']),
-                    subtitle: Text('ID: ${recipe['id']}'),
-                  ),
-                );
-              },
-            )
-                : ListView.builder(
-              itemCount: recipes.length,
-              itemBuilder: (context, index) {
-                final recipe = recipes[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListTile(
-                    title: Text(recipe['title']),
-                    subtitle: Text('ID: ${recipe['id']}'),
-                  ),
-                );
-              },
-            ),
-          ),
+          : recipes.isEmpty
+              ? ListView.builder(
+                  itemCount: exploreRecipes.length,
+                  itemBuilder: (context, index) {
+                    final recipe = exploreRecipes[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: recipe['image'] != null
+                            ? Image.network(
+                                recipe['image'],
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.image_not_supported),
+                        title: Text(recipe['title']),
+                      ),
+                    );
+                  },
+                )
+              : ListView.builder(
+                  itemCount: recipes.length,
+                  itemBuilder: (context, index) {
+                    final recipe = recipes[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: recipe['image'] != null
+                            ? Image.network(
+                                recipe['image'],
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.image_not_supported),
+                        title: Text(recipe['title']),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                              MaterialPageRoute(builder: (context) => RecipeDetailsPage(recipeId: recipe['id'])),
+                            );
+                        },
+                      ),
+                    );
+                  },
+                ),
+    ),
         ],
       ),
     );

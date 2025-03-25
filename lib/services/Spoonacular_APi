@@ -32,6 +32,18 @@ class SpoonacularService {
       throw Exception('Failed to fetch recipe details: ${response.statusCode}');
     }
   }
+    Future<List<dynamic>> searchRecipesByIngredients(String ingredients) async {
+    final url = Uri.parse(
+        '$_baseUrl/recipes/findByIngredients?ingredients=$ingredients&apiKey=$_apiKey&number=10');
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data; // This returns a list of recipes
+    } else {
+      throw Exception('Failed to fetch recipes by ingredients: ${response.statusCode}');
+    }
+  }
 
   Future<List<dynamic>> getRandomRecipes() async {
     // Fetch 10 random recipes

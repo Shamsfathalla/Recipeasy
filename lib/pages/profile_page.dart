@@ -10,31 +10,36 @@ class ProfilePage extends StatelessWidget {
 
   // Function to clear all notifications (UI-only for now)
   void _clearNotifications(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('All notifications cleared.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All notifications cleared.'))
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: true, // Adds a back button
-        title: const Text(
+        title: Text(
           'Profile',
-          style: TextStyle(color: Colors.white),
-        ), // White title text
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: Colors.white,
+          ),
+        ),
         centerTitle: true,
         elevation: 0,
         iconTheme: const IconThemeData(
           color: Colors.white,
-        ), // White back button
+        ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color.fromRGBO(168, 64, 185, 1), // RGB 168, 64, 185
-                Color.fromRGBO(110, 59, 226, 1), // RGB 110, 59, 226
+                Color.fromRGBO(168, 64, 185, 1),
+                Color.fromRGBO(110, 59, 226, 1),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -42,28 +47,32 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         actions: [
-          // Notifications dropdown menu
           PopupMenuButton<String>(
             icon: const Icon(
               Icons.notifications,
               color: Colors.white,
-            ), // White icon for contrast
+            ),
             itemBuilder: (BuildContext context) {
               return [
-                // Header for notifications
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'header',
                   child: Text(
                     'Notifications',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                   ),
                 ),
-                // Empty state message
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'empty',
-                  child: Text('No new notifications.'),
+                  child: Text(
+                    'No new notifications.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
                 ),
-                // Divider and Clear All button
                 const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'clear',
@@ -79,18 +88,16 @@ class ProfilePage extends StatelessWidget {
             },
             onSelected: (String value) {
               if (value == 'clear') {
-                _clearNotifications(context); // Clear all notifications
+                _clearNotifications(context);
               }
             },
           ),
-          // Settings icon button
           IconButton(
             icon: const Icon(
               Icons.settings,
               color: Colors.white,
-            ), // White icon for contrast
+            ),
             onPressed: () {
-              // Navigate to SettingsPage
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -102,13 +109,13 @@ class ProfilePage extends StatelessWidget {
         ],
       ),
       body: Container(
-        color: Colors.white, // Set background color to white
+        color: theme.scaffoldBackgroundColor,
         child: SingleChildScrollView(
           child: Column(
             children: [
-              _buildProfileHeader(),
-              _buildStatsRow(),
-              _buildFriendsSection(),
+              _buildProfileHeader(context),
+              _buildStatsRow(context),
+              _buildFriendsSection(context),
             ],
           ),
         ),
@@ -116,41 +123,38 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      color: Colors.white, // White background for the header
+      padding: const EdgeInsets.all(25),
+      color: theme.cardColor,
       child: Column(
         children: [
+          const SizedBox(height: 20), // Additional space above the avatar
           const CircleAvatar(
             radius: 40,
-            backgroundColor: Color.fromRGBO(
-              110,
-              59,
-              226,
-              1,
-            ), // Avatar background color
+            backgroundColor: Color.fromRGBO(110, 59, 226, 1),
             child: Icon(
               Icons.person,
               size: 50,
-              color: Colors.white, // Icon color
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 1),
           Text(
             user.displayName ?? 'User Name',
-            style: const TextStyle(
-              fontSize: 24,
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.black, // Black text color
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             user.email ?? 'No email provided',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.black87, // Darker black text color
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: isDarkMode ? Colors.white70 : Colors.black87,
             ),
           ),
         ],
@@ -158,20 +162,23 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatCard('Friends', '136'), // Friends stat
-          _buildStatCard('Following', '56'), // Following stat
+          _buildStatCard(context, 'Followers', '136', isDarkMode),
+          _buildStatCard(context, 'Following', '56', isDarkMode),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value) {
+  Widget _buildStatCard(BuildContext context, String title, String value, bool isDarkMode) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -181,16 +188,18 @@ class ProfilePage extends StatelessWidget {
           children: [
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color.fromRGBO(110, 59, 226, 1), // Text color
+                color: isDarkMode ? Colors.white : const Color.fromRGBO(110, 59, 226, 1),
               ),
             ),
             const SizedBox(height: 4),
             Text(
               title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isDarkMode ? Colors.white70 : Colors.grey,
+              ),
             ),
           ],
         ),
@@ -198,22 +207,24 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildFriendsSection() {
+  Widget _buildFriendsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Friends',
-            style: TextStyle(
-              fontSize: 20,
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.black, // Black text color
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
           const SizedBox(height: 10),
-          _buildFriendList(),
+          _buildFriendList(context, isDarkMode),
           const SizedBox(height: 10),
           _buildAddFriendButton(),
         ],
@@ -221,8 +232,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildFriendList() {
-    // Replace with your actual list of friends
+  Widget _buildFriendList(BuildContext context, bool isDarkMode) {
     final List<String> friends = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
 
     return ListView.builder(
@@ -234,22 +244,20 @@ class ProfilePage extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: const CircleAvatar(
-              backgroundColor: Color.fromRGBO(110, 59, 226, 1), // Icon color
+              backgroundColor: Color.fromRGBO(110, 59, 226, 1),
               child: Icon(Icons.person, color: Colors.white),
             ),
             title: Text(
               friends[index],
-              style: const TextStyle(color: Colors.black),
-            ), // Black text color
-            trailing: IconButton(
-              icon: const Icon(Icons.remove_circle, color: Colors.red),
-              onPressed: () {
-                // Add functionality to remove friend
-                _removeFriend(friends[index]);
-              },
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            trailing: const IconButton(
+              icon: Icon(Icons.remove_circle, color: Colors.red),
+              onPressed: null,
             ),
             onTap: () {
-              // Add functionality to view friend's profile
               _viewFriendProfile(friends[index]);
             },
           ),
@@ -265,37 +273,26 @@ class ProfilePage extends StatelessWidget {
         icon: const Icon(Icons.person_add, color: Colors.white),
         label: const Text('Add Friend', style: TextStyle(color: Colors.white)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromRGBO(
-            110,
-            59,
-            226,
-            1,
-          ), // Button color
+          backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        onPressed: () {
-          // Add functionality to add a friend
-          _addFriend();
-        },
+        onPressed: _addFriend,
       ),
     );
   }
 
   void _addFriend() {
-    // Implement logic to add a friend
     print('Add Friend');
   }
 
   void _removeFriend(String friendName) {
-    // Implement logic to remove a friend
     print('Removed $friendName');
   }
 
   void _viewFriendProfile(String friendName) {
-    // Implement logic to view friend's profile
     print('View $friendName\'s profile');
   }
 }

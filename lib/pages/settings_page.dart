@@ -5,6 +5,8 @@ import '/pages/profile_page.dart';
 import '/pages/shoplist_page.dart';
 import '/pages/create_page.dart';
 import '/pages/my_recipes_page.dart';
+import '/theme_provider.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
   final User? user;
@@ -44,12 +46,12 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         iconTheme: const IconThemeData(
           color: Colors.white,
-        ), // White back button
+        ),
         leading: IconButton(
           icon: const Icon(
             Icons.person,
             color: Colors.white,
-          ), // White profile icon
+          ),
           onPressed: () {
             Navigator.push(
               context,
@@ -65,14 +67,16 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(
               Icons.notifications,
               color: Colors.white,
-            ), // White notifications icon
+            ),
             itemBuilder: (BuildContext context) {
               return [
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'header',
                   child: Text(
                     'Notifications',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const PopupMenuItem<String>(
@@ -102,7 +106,7 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(
               Icons.settings,
               color: Colors.white,
-            ), // White settings icon
+            ),
             onPressed: () {
               Navigator.push(
                 context,
@@ -183,9 +187,11 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Settings',
-          style: TextStyle(color: Colors.white),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -209,8 +215,8 @@ class SettingsPage extends StatelessWidget {
         child: Column(
           children: [
             _buildAccountSection(context),
-            _buildPreferencesSection(),
-            _buildSupportSection(),
+            _buildPreferencesSection(context),
+            _buildSupportSection(context),
             _buildSignOutButton(context),
           ],
         ),
@@ -220,39 +226,58 @@ class SettingsPage extends StatelessWidget {
 
   Widget _buildAccountSection(BuildContext context) => _buildCard([
     _buildTile(
+      context,
       Icons.person,
       'Account Settings',
       user?.email ?? 'No email associated',
     ),
-    _buildSettingsOption(Icons.email, 'Change Email', () => _changeEmail(context)),
-    _buildSettingsOption(Icons.lock, 'Change Password', () => _changePassword(context)),
-    _buildSettingsOption(Icons.delete, 'Delete Account', () => _deleteAccount(context)),
+    _buildSettingsOption(context, Icons.email, 'Change Email', () => _changeEmail(context)),
+    _buildSettingsOption(context, Icons.lock, 'Change Password', () => _changePassword(context)),
+    _buildSettingsOption(context, Icons.delete, 'Delete Account', () => _deleteAccount(context)),
   ]);
 
-  Widget _buildPreferencesSection() => _buildCard([
-    const ListTile(
-      leading: Icon(Icons.settings, color: Color.fromRGBO(110, 59, 226, 1)),
+  Widget _buildPreferencesSection(BuildContext context) => _buildCard([
+    ListTile(
+      leading: const Icon(Icons.settings, color: Color.fromRGBO(110, 59, 226, 1)),
       title: Text(
         'Preferences',
-        style: TextStyle(color: Colors.black),
+        style: Theme.of(context).textTheme.bodyLarge,
       ),
     ),
-    _buildSettingsOption(Icons.notifications, 'Notification Settings', () {}),
-    _buildSettingsOption(Icons.palette, 'App Theme', () {}),
-    _buildSettingsOption(Icons.shopping_basket, 'Shopping List Preferences', () {}),
+    _buildSettingsOption(context, Icons.notifications, 'Notification Settings', () {}),
+    _buildThemeToggleOption(context),
+    _buildSettingsOption(context, Icons.shopping_basket, 'Shopping List Preferences', () {}),
   ]);
 
-  Widget _buildSupportSection() => _buildCard([
-    const ListTile(
-      leading: Icon(Icons.help, color: Color.fromRGBO(110, 59, 226, 1)),
+  Widget _buildThemeToggleOption(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return SwitchListTile(
+          secondary: const Icon(Icons.palette, color: Color.fromRGBO(110, 59, 226, 0.7)),
+          title: Text(
+            'Dark Mode',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          value: themeProvider.isDarkMode,
+          onChanged: (value) {
+            themeProvider.toggleTheme(value);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSupportSection(BuildContext context) => _buildCard([
+    ListTile(
+      leading: const Icon(Icons.help, color: Color.fromRGBO(110, 59, 226, 1)),
       title: Text(
         'Support',
-        style: TextStyle(color: Colors.black),
+        style: Theme.of(context).textTheme.bodyLarge,
       ),
     ),
-    _buildSettingsOption(Icons.help_center, 'Help & FAQ', () {}),
-    _buildSettingsOption(Icons.description, 'Terms of Service', () {}),
-    _buildSettingsOption(Icons.security, 'Privacy Policy', () {}),
+    _buildSettingsOption(context, Icons.help_center, 'Help & FAQ', () {}),
+    _buildSettingsOption(context, Icons.description, 'Terms of Service', () {}),
+    _buildSettingsOption(context, Icons.security, 'Privacy Policy', () {}),
   ]);
 
   Widget _buildSignOutButton(BuildContext context) => Padding(
@@ -264,16 +289,28 @@ class SettingsPage extends StatelessWidget {
         final confirm = await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Sign Out'),
-            content: const Text('Are you sure you want to sign out?'),
+            title: Text(
+              'Sign Out',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            content: Text(
+              'Are you sure you want to sign out?',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(
+                  'Cancel',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Sign Out'),
+                child: Text(
+                  'Sign Out',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
             ],
           ),
@@ -292,28 +329,29 @@ class SettingsPage extends StatelessWidget {
     child: Column(children: children),
   );
 
-  Widget _buildTile(IconData icon, String title, String subtitle) => ListTile(
-    leading: Icon(icon, color: Color.fromRGBO(110, 59, 226, 1)),
+  Widget _buildTile(BuildContext context, IconData icon, String title, String subtitle) => ListTile(
+    leading: Icon(icon, color: const Color.fromRGBO(110, 59, 226, 1)),
     title: Text(
       title,
-      style: TextStyle(color: Colors.black),
+      style: Theme.of(context).textTheme.bodyLarge,
     ),
     subtitle: Text(
       subtitle,
-      style: TextStyle(color: Colors.black87),
+      style: Theme.of(context).textTheme.bodyMedium,
     ),
   );
 
-  Widget _buildSettingsOption(IconData icon, String title, Function() onTap) => ListTile(
-    leading: Icon(icon, color: Color.fromRGBO(110, 59, 226, 0.7)),
+  Widget _buildSettingsOption(BuildContext context, IconData icon, String title, Function() onTap) => ListTile(
+    leading: Icon(icon, color: const Color.fromRGBO(110, 59, 226, 0.7)),
     title: Text(
       title,
-      style: TextStyle(color: Colors.black),
+      style: Theme.of(context).textTheme.bodyLarge,
     ),
     trailing: const Icon(Icons.chevron_right, color: Colors.grey),
     onTap: onTap,
   );
 
+  // ... (keep all the remaining methods unchanged)
   Future<void> _changeEmail(BuildContext context) async {
     final newEmail = await _showInputDialog(
       context,
@@ -400,16 +438,28 @@ class SettingsPage extends StatelessWidget {
     final confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text('Are you sure you want to delete your account? This action cannot be undone.'),
+        title: Text(
+          'Delete Account',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        content: Text(
+          'Are you sure you want to delete your account? This action cannot be undone.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text(
+              'Delete',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
         ],
       ),
@@ -437,7 +487,10 @@ class SettingsPage extends StatelessWidget {
     return showDialog<Map<String, String>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Change Password'),
+        title: Text(
+          'Change Password',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -469,7 +522,10 @@ class SettingsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -490,7 +546,10 @@ class SettingsPage extends StatelessWidget {
                 'confirmPassword': confirmPassword,
               });
             },
-            child: const Text('Submit'),
+            child: Text(
+              'Submit',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
         ],
       ),
@@ -508,7 +567,10 @@ class SettingsPage extends StatelessWidget {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -527,11 +589,17 @@ class SettingsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, textController.text),
-            child: const Text('Submit'),
+            child: Text(
+              'Submit',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
         ],
       ),

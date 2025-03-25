@@ -1,28 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'auth.dart'; // Import your Auth class
-import 'pages/login_register_page.dart'; // Import the LoginPage
-import 'pages/home_page.dart'; // Import the HomePage
-import 'firebase_options.dart'; // Import Firebase options
+import 'package:provider/provider.dart';
+import 'auth.dart';
+import 'pages/login_register_page.dart';
+import 'pages/home_page.dart';
+import 'firebase_options.dart';
+import 'theme_provider.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // Ensures correct platform settings
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  final Auth _auth = Auth(); // Create an instance of your Auth class
+  final Auth _auth = Auth();
+
   MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: 'Firebase Auth Demo',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.light, // Light theme
+      ),
+      darkTheme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.dark, // Dark theme
+        // Add other dark theme customizations as needed
+      ),
+      themeMode: themeProvider.themeMode, // Use the provider's theme mode
       home: StreamBuilder<User?>(
         stream: _auth.authStateChanges,
         builder: (context, snapshot) {

@@ -21,12 +21,12 @@ class _HomePageState extends State<HomePage> {
   final Auth _auth = Auth();
   int _selectedIndex = 0;
 
-  final SpoonacularService _spoonacularService = SpoonacularService(); // Ensure this matches the class name
+  final SpoonacularService _spoonacularService = SpoonacularService();
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _recipes = [];
   List<dynamic> _exploreRecipes = [];
   bool _isLoading = false;
-  bool _isSearching = false; // New state to track if the user is searching
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -51,41 +51,39 @@ class _HomePageState extends State<HomePage> {
       _selectedIndex = index;
       _searchController.clear();
       _recipes = [];
-      _isSearching = false; // Reset search state when switching pages
-      _fetchRandomRecipes(); // Reset to explore recipes when switching pages
+      _isSearching = false;
+      _fetchRandomRecipes();
     });
   }
 
-void _searchRecipes(String query, {bool byIngredients = false}) async {
-  if (query.isEmpty) return;
+  void _searchRecipes(String query) async {
+    if (query.isEmpty) return;
 
-  setState(() {
-    _isLoading = true;
-    _isSearching = true; // Set search state to true
-  });
+    setState(() {
+      _isLoading = true;
+      _isSearching = true;
+    });
 
-  try {
-    final recipes = byIngredients
-        ? await _spoonacularService.searchRecipesByIngredients(query)
-        : await _spoonacularService.searchRecipes(query);
-    setState(() {
-      _recipes = recipes;
-    });
-  } catch (e) {
-    print('Error: $e');
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
+    try {
+      final recipes = await _spoonacularService.searchRecipes(query);
+      setState(() {
+        _recipes = recipes;
+      });
+    } catch (e) {
+      print('Error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
-}
 
   void _clearSearch() {
     setState(() {
       _searchController.clear();
       _recipes = [];
-      _isSearching = false; // Reset search state
-      _fetchRandomRecipes(); // Reset to explore recipes
+      _isSearching = false;
+      _fetchRandomRecipes();
     });
   }
 
@@ -95,13 +93,12 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
     );
   }
 
-  // Reset the home page to default state
   void _resetHomePage() {
     setState(() {
       _searchController.clear();
       _recipes = [];
       _isSearching = false;
-      _fetchRandomRecipes(); // Fetch random recipes again
+      _fetchRandomRecipes();
     });
   }
 
@@ -116,7 +113,7 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
         clearSearch: _clearSearch,
         exploreRecipes: _exploreRecipes,
         fetchRandomRecipes: _fetchRandomRecipes,
-        isSearching: _isSearching, // Pass the search state
+        isSearching: _isSearching,
       ),
       CreatePage(),
       MyRecipesPage(),
@@ -128,7 +125,6 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
         leading: IconButton(
           icon: const Icon(Icons.person, color: Colors.white),
           onPressed: () async {
-            // Navigate to profile page and reset home page when returning
             await Navigator.push(
               context,
               MaterialPageRoute(
@@ -136,7 +132,7 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
                     ProfilePage(user: FirebaseAuth.instance.currentUser!),
               ),
             );
-            _resetHomePage(); // Reset home page when returning
+            _resetHomePage();
           },
         ),
         actions: [
@@ -175,7 +171,6 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () async {
-              // Navigate to settings page and reset home page when returning
               await Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -183,7 +178,7 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
                       SettingsPage(user: FirebaseAuth.instance.currentUser),
                 ),
               );
-              _resetHomePage(); // Reset home page when returning
+              _resetHomePage();
             },
           ),
         ],
@@ -209,7 +204,8 @@ void _searchRecipes(String query, {bool byIngredients = false}) async {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.create), label: 'Create'),
           BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Recipes'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Shop List'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_cart), label: 'Shop List'),
         ],
       ),
     );
@@ -244,10 +240,8 @@ class HomeContent extends StatelessWidget {
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          // Search Bar with Search Icon Inside and Filter Button Outside
           Row(
             children: [
-              // Expanded Search Bar with Search Icon Inside
               Expanded(
                 child: TextField(
                   controller: searchController,
@@ -256,7 +250,7 @@ class HomeContent extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10.0),
                     ),
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey), // Search icon inside the bar
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     suffixIcon: searchController.text.isEmpty
                         ? null
                         : IconButton(
@@ -272,7 +266,6 @@ class HomeContent extends StatelessWidget {
                   },
                 ),
               ),
-              // Filter Button Outside Search Bar
               IconButton(
                 icon: const Icon(Icons.filter_list),
                 onPressed: () {
@@ -282,7 +275,7 @@ class HomeContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          if (!isSearching) // Only show "Explore Recipes" section when not searching
+          if (!isSearching)
             Column(
               children: [
                 Row(
@@ -292,7 +285,6 @@ class HomeContent extends StatelessWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
-                    // Filter Button next to Refresh
                     IconButton(
                       icon: const Icon(Icons.filter_list),
                       onPressed: () {
@@ -309,58 +301,56 @@ class HomeContent extends StatelessWidget {
               ],
             ),
           Expanded(
-      child: isLoading
-          ? const Center(
+            child: isLoading
+                ? const Center(
               child: CircularProgressIndicator(),
             )
-          : recipes.isEmpty
-              ? ListView.builder(
-                  itemCount: exploreRecipes.length,
-                  itemBuilder: (context, index) {
-                    final recipe = exploreRecipes[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        leading: recipe['image'] != null
-                            ? Image.network(
-                                recipe['image'],
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                              )
-                            : const Icon(Icons.image_not_supported),
-                        title: Text(recipe['title']),
-                      ),
-                    );
-                  },
-                )
-              : ListView.builder(
-                  itemCount: recipes.length,
-                  itemBuilder: (context, index) {
-                    final recipe = recipes[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        leading: recipe['image'] != null
-                            ? Image.network(
-                                recipe['image'],
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                              )
-                            : const Icon(Icons.image_not_supported),
-                        title: Text(recipe['title']),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                              MaterialPageRoute(builder: (context) => RecipeDetailsPage(recipeId: recipe['id'])),
-                            );
-                        },
-                      ),
-                    );
-                  },
-                ),
-    ),
+                : (isSearching ? recipes : exploreRecipes).isEmpty
+                ? const Center(child: Text('No recipes found'))
+                : ListView.builder(
+              itemCount: isSearching ? recipes.length : exploreRecipes.length,
+              itemBuilder: (context, index) {
+                final recipe = isSearching ? recipes[index] : exploreRecipes[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: recipe['image'] != null && recipe['image'].isNotEmpty
+                        ? Image.network(
+                      recipe['image'],
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.image_not_supported);
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      },
+                    )
+                        : const Icon(Icons.image_not_supported),
+                    title: Text(recipe['title'] ?? 'Untitled Recipe'),
+                    onTap: () {
+                      if (recipe['id'] != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RecipeDetailsPage(recipeId: recipe['id']),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

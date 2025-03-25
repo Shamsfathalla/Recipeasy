@@ -49,9 +49,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_isBookmarked
-            ? 'Recipe bookmarked!'
-            : 'Bookmark removed'),
+        content: Text(_isBookmarked ? 'Recipe bookmarked!' : 'Bookmark removed'),
         duration: const Duration(seconds: 1),
       ),
     );
@@ -59,22 +57,29 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
 
   Widget _buildImageSection() {
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.4,
+      height: 250,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image.network(
           _recipeDetails!['image'],
           fit: BoxFit.cover,
-          width: double.infinity,
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Center(
               child: CircularProgressIndicator(
                 value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                    loadingProgress.expectedTotalBytes!
+                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
                     : null,
               ),
             );
@@ -82,7 +87,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
           errorBuilder: (context, error, stackTrace) {
             return Container(
               color: Colors.grey[200],
-              child: const Icon(Icons.fastfood, size: 100, color: Colors.grey),
+              child: const Icon(Icons.fastfood, size: 60, color: Colors.grey),
             );
           },
         ),
@@ -90,15 +95,50 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     );
   }
 
-  Widget _buildTextSection(String text, {bool isTitle = false}) {
+  Widget _buildSectionTitle(String text) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.only(top: 24, bottom: 12),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: isTitle ? 24 : 16,
-          fontWeight: isTitle ? FontWeight.bold : FontWeight.normal,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: const Color.fromRGBO(110, 59, 226, 1), // Purple color
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextContent(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIngredientItem(String ingredient) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6, right: 8),
+            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(110, 59, 226, 1)), // Purple color
+          ),
+          Expanded(
+            child: Text(
+              ingredient,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -108,6 +148,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_recipeDetails?['title'] ?? 'Recipe Details'),
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -122,71 +163,87 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchRecipeDetails,
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: const Color.fromRGBO(110, 59, 226, 1), // Purple color
+              ),
               child: const Text('Retry'),
             ),
           ],
         ),
       )
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (_recipeDetails!['image'] != null) _buildImageSection(),
-            const SizedBox(height: 16),
-            // Recipe title with bookmark button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: _buildTextSection(
-                    _recipeDetails!['title'],
-                    isTitle: true,
+
+            // Title and Bookmark
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _recipeDetails!['title'],
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    color: _isBookmarked ? Colors.amber : Colors.grey,
-                    size: 28,
+                  IconButton(
+                    icon: Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey[600],
+                      size: 30,
+                    ),
+                    onPressed: _toggleBookmark,
                   ),
-                  onPressed: _toggleBookmark,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (_recipeDetails!.containsKey('summary'))
-              _buildTextSection(
-                _recipeDetails!['summary']
-                    .replaceAll(RegExp(r'<[^>]*>'), ''),
+                ],
               ),
+            ),
+
+            // Description
+            if (_recipeDetails!.containsKey('summary'))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('About this recipe'),
+                  _buildTextContent(
+                    _recipeDetails!['summary'].replaceAll(RegExp(r'<[^>]*>'), ''),
+                  ),
+                  const Divider(height: 24),
+                ],
+              ),
+
+            // Ingredients
             if (_recipeDetails!.containsKey('extendedIngredients'))
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
-                  _buildTextSection('Ingredients:', isTitle: true),
+                  _buildSectionTitle('Ingredients'),
                   ..._recipeDetails!['extendedIngredients']
-                      .map<Widget>((ingredient) => Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 4.0),
-                    child: Text(
-                        '• ${ingredient['original']}'),
-                  ))
+                      .map<Widget>((ingredient) => _buildIngredientItem(ingredient['original']))
                       .toList(),
+                  const Divider(height: 24),
                 ],
               ),
+
+            // Instructions
             if (_recipeDetails!.containsKey('instructions') &&
                 _recipeDetails!['instructions'] != null &&
                 _recipeDetails!['instructions'].isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
-                  _buildTextSection('Instructions:', isTitle: true),
-                  _buildTextSection(
-                    _recipeDetails!['instructions']
-                        .replaceAll(RegExp(r'<[^>]*>'), ''),
+                  _buildSectionTitle('Instructions'),
+                  _buildTextContent(
+                    _recipeDetails!['instructions'].replaceAll(RegExp(r'<[^>]*>'), ''),
                   ),
                 ],
               ),

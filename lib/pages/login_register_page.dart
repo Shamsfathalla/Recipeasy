@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../auth.dart'; // Import your Auth class
-import '../pages/home_page.dart'; // Import the HomePage
+import '../auth.dart';
+import '../pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -16,35 +16,30 @@ class _LoginPageState extends State<LoginPage> {
   bool isLogin = true;
   bool showForgotPassword = false;
   String headerText = "Welcome";
-
-  // New variable for Forgot Password message
   String forgotPasswordMessage = '';
+
+  // Color constants
+  final Color iconColor = Colors.blueAccent;
+  final Color purpleTextColor = Colors.deepPurple;
+  final Color accentButtonColor = Colors.blueAccent;
 
   final TextEditingController _controllerName = TextEditingController();
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
-  final TextEditingController _controllerConfirmPassword =
-      TextEditingController();
-  final TextEditingController _controllerForgotPasswordEmail =
-      TextEditingController();
+  final TextEditingController _controllerConfirmPassword = TextEditingController();
+  final TextEditingController _controllerForgotPasswordEmail = TextEditingController();
 
-  // Function to clear only the password field
   void _clearPasswordField() {
     _controllerPassword.clear();
-    setState(() {
-      errorMessage = ''; // Clear any error messages
-    });
+    setState(() => errorMessage = '');
   }
 
-  // Function to clear all text controllers
   void _clearTextControllers() {
     _controllerName.clear();
     _controllerEmail.clear();
     _controllerPassword.clear();
     _controllerConfirmPassword.clear();
-    setState(() {
-      errorMessage = ''; // Clear any error messages
-    });
+    setState(() => errorMessage = '');
   }
 
   Future<void> signInWithEmailAndPassword() async {
@@ -59,7 +54,6 @@ class _LoginPageState extends State<LoginPage> {
         password: _controllerPassword.text,
       );
       setState(() => errorMessage = '');
-      // Navigate to HomePage after successful sign-in
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomePage()),
@@ -89,19 +83,17 @@ class _LoginPageState extends State<LoginPage> {
         password: _controllerPassword.text,
       );
       setState(() {
-        errorMessage = 'Sign up successful! Please sign in.'; // Success message
-        _clearTextControllers(); // Clear the form fields
-        // Switch to Sign-In mode
+        errorMessage = 'Sign up successful! Please sign in.';
+        // Copy email to sign-in form before clearing
+        final signedUpEmail = _controllerEmail.text;
+        _clearTextControllers();
+        _controllerEmail.text = signedUpEmail; // Set the email in sign-in form
         isLogin = true;
         headerText = "Hello, sign in";
       });
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') {
-        setState(
-          () =>
-              errorMessage =
-                  'The email address is already in use by another account.',
-        );
+        setState(() => errorMessage = 'The email address is already in use by another account.');
       } else {
         setState(() => errorMessage = e.message ?? 'An error occurred');
       }
@@ -109,17 +101,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _entryField(
-    String hintText,
-    TextEditingController controller,
-    IconData icon,
-    bool isPassword,
-  ) {
+      String hintText,
+      TextEditingController controller,
+      IconData icon,
+      bool isPassword,
+      ) {
     return TextField(
       controller: controller,
       obscureText: isPassword,
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: Icon(icon, color: Colors.blueAccent),
+        prefixIcon: Icon(icon, color: iconColor),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
@@ -131,10 +123,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Text(
         errorMessage,
         style: TextStyle(
-          color:
-              errorMessage.contains('success')
-                  ? Colors.green
-                  : Colors.red, // Green for success, red for errors
+          color: errorMessage.contains('success') ? Colors.green : Colors.red,
           fontSize: 14,
         ),
         textAlign: TextAlign.center,
@@ -147,14 +136,11 @@ class _LoginPageState extends State<LoginPage> {
       width: double.infinity,
       height: 55,
       child: ElevatedButton(
-        onPressed:
-            isLogin
-                ? signInWithEmailAndPassword
-                : createUserWithEmailAndPassword,
+        onPressed: isLogin ? signInWithEmailAndPassword : createUserWithEmailAndPassword,
         style: ElevatedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          foregroundColor: Theme.of(context).textTheme.bodyMedium?.color,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: EdgeInsets.zero,
           textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
@@ -167,17 +153,15 @@ class _LoginPageState extends State<LoginPage> {
     return TextButton(
       onPressed: () {
         setState(() {
-          showForgotPassword = true; // Open forgot password box
-          showForm = false; // Close sign-in/sign-up box
-          _clearPasswordField(); // Clear only the password field
-          _controllerForgotPasswordEmail.text =
-              _controllerEmail
-                  .text; // Copy email from Sign In to Forgot Password
+          showForgotPassword = true;
+          showForm = false;
+          _clearPasswordField();
+          _controllerForgotPasswordEmail.text = _controllerEmail.text;
         });
       },
-      child: const Text(
+      child: Text(
         'Forgot Password?',
-        style: TextStyle(color: Colors.blueAccent, fontSize: 16),
+        style: TextStyle(color: accentButtonColor, fontSize: 16),
       ),
     );
   }
@@ -186,21 +170,21 @@ class _LoginPageState extends State<LoginPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Not signed up? ',
-          style: TextStyle(fontSize: 16, color: Colors.black87),
+          style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
         ),
         TextButton(
           onPressed: () {
             setState(() {
-              isLogin = false; // Switch to sign-up mode
+              isLogin = false;
               headerText = "Create your account";
-              _clearTextControllers(); // Clear text fields
+              _clearTextControllers();
             });
           },
-          child: const Text(
+          child: Text(
             'Sign up',
-            style: TextStyle(fontSize: 16, color: Colors.blueAccent),
+            style: TextStyle(fontSize: 16, color: accentButtonColor),
           ),
         ),
       ],
@@ -211,21 +195,21 @@ class _LoginPageState extends State<LoginPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Already signed up? ',
-          style: TextStyle(fontSize: 16, color: Colors.black87),
+          style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
         ),
         TextButton(
           onPressed: () {
             setState(() {
-              isLogin = true; // Switch to sign-in mode
+              isLogin = true;
               headerText = "Hello, sign in";
-              _clearTextControllers(); // Clear text fields
+              _clearTextControllers();
             });
           },
-          child: const Text(
+          child: Text(
             'Sign in',
-            style: TextStyle(fontSize: 16, color: Colors.blueAccent),
+            style: TextStyle(fontSize: 16, color: accentButtonColor),
           ),
         ),
       ],
@@ -236,8 +220,7 @@ class _LoginPageState extends State<LoginPage> {
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeInOut,
-      bottom:
-          showForgotPassword ? 0 : -MediaQuery.of(context).size.height * 0.6,
+      bottom: showForgotPassword ? 0 : -MediaQuery.of(context).size.height * 0.6,
       left: 0,
       right: 0,
       child: AnimatedOpacity(
@@ -247,7 +230,7 @@ class _LoginPageState extends State<LoginPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).dialogBackgroundColor,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
@@ -263,17 +246,16 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Reset Password',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.titleLarge?.color,
+                ),
               ),
               const SizedBox(height: 20),
-              _entryField(
-                'Email',
-                _controllerForgotPasswordEmail,
-                Icons.email,
-                false,
-              ),
+              _entryField('Email', _controllerForgotPasswordEmail, Icons.email, false),
               const SizedBox(height: 10),
               if (forgotPasswordMessage.isNotEmpty)
                 Padding(
@@ -281,10 +263,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Text(
                     forgotPasswordMessage,
                     style: TextStyle(
-                      color:
-                          forgotPasswordMessage.contains('error')
-                              ? Colors.red
-                              : Colors.green,
+                      color: forgotPasswordMessage.contains('error') ? Colors.red : Colors.green,
                       fontSize: 14,
                     ),
                     textAlign: TextAlign.center,
@@ -294,47 +273,37 @@ class _LoginPageState extends State<LoginPage> {
               ElevatedButton(
                 onPressed: () async {
                   if (_controllerForgotPasswordEmail.text.isEmpty) {
-                    setState(() {
-                      forgotPasswordMessage = 'Please enter your email';
-                    });
+                    setState(() => forgotPasswordMessage = 'Please enter your email');
                     return;
                   }
 
                   try {
-                    await Auth().sendPasswordResetEmail(
-                      _controllerForgotPasswordEmail.text,
-                    );
-                    setState(() {
-                      forgotPasswordMessage =
-                          'Password reset link sent! Check your inbox.';
-                    });
+                    await Auth().sendPasswordResetEmail(_controllerForgotPasswordEmail.text);
+                    setState(() => forgotPasswordMessage = 'Password reset link sent! Check your inbox.');
                   } on FirebaseAuthException catch (e) {
-                    if (e.code == 'user-not-found') {
-                      setState(() {
-                        forgotPasswordMessage =
-                            'Error: No user found with this email.';
-                      });
-                    } else {
-                      setState(() {
-                        forgotPasswordMessage = 'Error: ${e.message}';
-                      });
-                    }
+                    setState(() => forgotPasswordMessage = e.code == 'user-not-found'
+                        ? 'Error: No user found with this email.'
+                        : 'Error: ${e.message}');
                   }
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  foregroundColor: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
                 child: const Text('Send Reset Link'),
               ),
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () {
                   setState(() {
-                    showForgotPassword = false; // Close forgot password box
-                    showForm = true; // Reopen sign-in form
-                    forgotPasswordMessage = ''; // Clear the message
+                    showForgotPassword = false;
+                    showForm = true;
+                    forgotPasswordMessage = '';
                   });
                 },
-                child: const Text(
+                child: Text(
                   'Back to Sign In',
-                  style: TextStyle(color: Colors.blueAccent, fontSize: 16),
+                  style: TextStyle(color: accentButtonColor, fontSize: 16),
                 ),
               ),
             ],
@@ -347,13 +316,16 @@ class _LoginPageState extends State<LoginPage> {
   Widget _form() {
     return AnimatedCrossFade(
       duration: const Duration(milliseconds: 500),
-      crossFadeState:
-          isLogin ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+      crossFadeState: isLogin ? CrossFadeState.showFirst : CrossFadeState.showSecond,
       firstChild: Column(
         children: [
-          const Text(
+          Text(
             'Welcome Back',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.titleLarge?.color,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
@@ -368,9 +340,13 @@ class _LoginPageState extends State<LoginPage> {
       ),
       secondChild: Column(
         children: [
-          const Text(
+          Text(
             'Create your Account',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.titleLarge?.color,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
@@ -380,12 +356,7 @@ class _LoginPageState extends State<LoginPage> {
           const SizedBox(height: 15),
           _entryField('Password', _controllerPassword, Icons.lock, true),
           const SizedBox(height: 15),
-          _entryField(
-            'Confirm Password',
-            _controllerConfirmPassword,
-            Icons.lock,
-            true,
-          ),
+          _entryField('Confirm Password', _controllerConfirmPassword, Icons.lock, true),
           _errorMessage(),
           _submitButton(),
           _alreadySignedUpButton(),
@@ -401,52 +372,44 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Image
           Positioned.fill(
             child: Image.asset(
-              'assets/images/background.png', // Path to your background image
-              fit: BoxFit.cover, // Ensures the image covers the entire screen
+              'assets/images/background.png',
+              fit: BoxFit.cover,
             ),
           ),
 
-          // Logo Image (Animated Position and Size)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
-            top:
-                showForm && !isLogin
-                    ? screenHeight * 0.13
-                    : screenHeight * 0.19, // Adjusted position
+            top: showForm && !isLogin ? screenHeight * 0.13 : screenHeight * 0.19,
             left: 0,
             right: 0,
             child: Center(
               child: Image.asset(
-                'assets/images/logo.png', // Path to your logo image
-                width: 275, // Adjusted width
-                height: 275, // Adjusted height
+                'assets/images/logo.png',
+                width: 275,
+                height: 275,
               ),
             ),
           ),
 
-          // Content Overlay
           Stack(
             alignment: Alignment.center,
             children: [
-              // Background GestureDetector to detect taps outside the form
               if (showForm || showForgotPassword)
                 GestureDetector(
                   onTap: () {
                     setState(() {
                       if (showForgotPassword) {
-                        showForgotPassword = false; // Close forgot password box
-                        showForm = true; // Reopen sign-in form
-                        forgotPasswordMessage = ''; // Clear the message
+                        showForgotPassword = false;
+                        showForm = true;
+                        forgotPasswordMessage = '';
                       } else {
-                        showForm = false; // Close sign-in/sign-up box
-                        showForgotPassword =
-                            false; // Ensure forgot password box is also closed
+                        showForm = false;
+                        showForgotPassword = false;
                         errorMessage = '';
-                        isLogin = true; // Default to sign-in mode
+                        isLogin = true;
                         headerText = "Welcome";
                       }
                     });
@@ -455,11 +418,8 @@ class _LoginPageState extends State<LoginPage> {
                   child: Container(color: Colors.transparent),
                 ),
 
-              // Sign In and Sign Up Buttons
               Positioned(
-                top:
-                    screenHeight *
-                    0.51, // Adjusted position below the welcome text
+                top: screenHeight * 0.51,
                 left: 0,
                 right: 0,
                 child: Visibility(
@@ -474,13 +434,13 @@ class _LoginPageState extends State<LoginPage> {
                             setState(() {
                               isLogin = true;
                               showForm = true;
-                              _clearTextControllers(); // Clear text fields
+                              _clearTextControllers();
                             });
                           },
                           style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            foregroundColor: purpleTextColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: EdgeInsets.zero,
                             textStyle: const TextStyle(
                               fontSize: 40,
@@ -499,13 +459,13 @@ class _LoginPageState extends State<LoginPage> {
                             setState(() {
                               isLogin = false;
                               showForm = true;
-                              _clearTextControllers(); // Clear text fields
+                              _clearTextControllers();
                             });
                           },
                           style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                            backgroundColor: Theme.of(context).colorScheme.surface,
+                            foregroundColor: purpleTextColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: EdgeInsets.zero,
                             textStyle: const TextStyle(
                               fontSize: 40,
@@ -520,7 +480,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
 
-              // Form Container
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 500),
                 bottom: showForm ? 0 : -screenHeight * 0.6,
@@ -533,7 +492,7 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).dialogBackgroundColor,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
                         topRight: Radius.circular(20),
@@ -551,7 +510,6 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
 
-              // Forgot Password Box
               _forgotPasswordBox(),
             ],
           ),

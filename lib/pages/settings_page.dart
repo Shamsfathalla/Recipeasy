@@ -7,6 +7,7 @@ import '/pages/create_page.dart';
 import '/pages/my_recipes_page.dart';
 import '/theme_provider.dart';
 import 'package:provider/provider.dart';
+import '../pages/login_register_page.dart';
 
 class HomePage extends StatefulWidget {
   final User? user;
@@ -285,43 +286,37 @@ class SettingsPage extends StatelessWidget {
     child: ElevatedButton.icon(
       icon: const Icon(Icons.logout),
       label: const Text('Sign Out'),
-      onPressed: () async {
-        final confirm = await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(
-              'Sign Out',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            content: Text(
-              'Are you sure you want to sign out?',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: Theme.of(context).textTheme.bodyMedium,
+        onPressed: () async {
+          final confirm = await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Sign Out'),
+              content: const Text('Are you sure you want to sign out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
                 ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  'Sign Out',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Sign Out'),
                 ),
-              ),
-            ],
-          ),
-        );
-        if (confirm == true) {
-          await Auth().signOut();
-          Navigator.of(context).popUntil((route) => route.isFirst);
+              ],
+            ),
+          );
+
+          if (confirm == true) {
+            await FirebaseAuth.instance.signOut(); // ✅ Ensure Firebase Auth signs out
+
+            // ✅ Instead of navigating manually, let StreamBuilder detect the auth change
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => LoginPage()),
+                  (route) => false, // Clear all previous routes
+            );
+          }
         }
-      },
-    ),
-  );
+    )
+    );
 
   Widget _buildCard(List<Widget> children) => Card(
     margin: const EdgeInsets.all(16),

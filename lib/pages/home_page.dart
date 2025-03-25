@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import '/auth.dart'; // Import your Auth class
-// Import the LoginPage
-import '/pages/profile_page.dart'; // Import ProfilePage
-import '/pages/shoplist_page.dart'; // Import ShopListPage
-import '/pages/create_page.dart'; // Import CreatePage
-import '/pages/my_recipes_page.dart'; // Import MyRecipesPage
-import '/pages/settings_page.dart'; // Import SettingsPage
-import 'package:firebase_auth/firebase_auth.dart'; // For FirebaseAuth instance
+import 'package:recipeasy/pages/recipe_details.dart';
+import '/auth.dart';
+import '/pages/profile_page.dart';
+import '/pages/shoplist_page.dart';
+import '/pages/create_page.dart';
+import '/pages/my_recipes_page.dart';
+import '/pages/settings_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/Spoonacular_APi';
+import 'dart:math';
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -16,124 +18,172 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final Auth _auth = Auth(); // Create an instance of your Auth class
-  int _selectedIndex = 0; // Index of the selected bottom navigation bar item
+  final Auth _auth = Auth();
+  int _selectedIndex = 0;
 
-  final SpoonacularService _spoonacularService = SpoonacularService(); // Instance of SpoonacularService
-  final TextEditingController _searchController = TextEditingController(); // Controller for search input
-  List<dynamic> _recipes = []; // List to store search results
-  bool _isLoading = false; // Loading state
+  final SpoonacularService _spoonacularService = SpoonacularService(); // Ensure this matches the class name
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _recipes = [];
+  List<dynamic> _exploreRecipes = [];
+  bool _isLoading = false;
+  bool _isSearching = false; // New state to track if the user is searching
 
-  // List of pages/screens corresponding to the bottom navigation bar items
-  final List<Widget> _pages = [
-    HomeContent(), // Home Page
-    CreatePage(), // Create Page
-    MyRecipesPage(), // My Recipes Page
-    ShopListPage(), // Shop List Page
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchRandomRecipes();
+  }
 
-  // Function to handle bottom navigation bar item taps
+  void _fetchRandomRecipes() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final recipes = await _spoonacularService.getRandomRecipes();
+    setState(() {
+      _exploreRecipes = recipes;
+      _isLoading = false;
+    });
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
+      _searchController.clear();
+      _recipes = [];
+      _isSearching = false; // Reset search state when switching pages
+      _fetchRandomRecipes(); // Reset to explore recipes when switching pages
     });
   }
-  void _searchRecipes() async {
-      setState(() {
-        _isLoading = true; // Show loading indicator
-      });
 
-      try {
-        final recipes = await _spoonacularService.searchRecipes(_searchController.text);
-        setState(() {
-          _recipes = recipes; // Update the recipes list with results
-        });
-      } catch (e) {
-        print('Error: $e'); // Handle errors
-      } finally {
-        setState(() {
-          _isLoading = false; // Hide loading indicator
-        });
-      }
-    }
+void _searchRecipes(String query, {bool byIngredients = false}) async {
+  if (query.isEmpty) return;
 
-  // Function to clear all notifications (UI-only for now)
-  void _clearNotifications() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('All notifications cleared.')));
+  setState(() {
+    _isLoading = true;
+    _isSearching = true; // Set search state to true
+  });
+
+  try {
+    final recipes = byIngredients
+        ? await _spoonacularService.searchRecipesByIngredients(query)
+        : await _spoonacularService.searchRecipes(query);
+    setState(() {
+      _recipes = recipes;
+    });
+  } catch (e) {
+    print('Error: $e');
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _recipes = [];
+      _isSearching = false; // Reset search state
+      _fetchRandomRecipes(); // Reset to explore recipes
+    });
   }
 
-@override
+  void _clearNotifications() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('All notifications cleared.')),
+    );
+  }
+
+  // Reset the home page to default state
+  void _resetHomePage() {
+    setState(() {
+      _searchController.clear();
+      _recipes = [];
+      _isSearching = false;
+      _fetchRandomRecipes(); // Fetch random recipes again
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final List<Widget> _pages = [
+      HomeContent(
+        searchRecipes: _searchRecipes,
+        recipes: _recipes,
+        isLoading: _isLoading,
+        searchController: _searchController,
+        clearSearch: _clearSearch,
+        exploreRecipes: _exploreRecipes,
+        fetchRandomRecipes: _fetchRandomRecipes,
+        isSearching: _isSearching, // Pass the search state
+      ),
+      CreatePage(),
+      MyRecipesPage(),
+      ShopListPage(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(
-            Icons.person,
-            color: Colors.white,
-          ), // Profile icon in the top-left
-          onPressed: () {
-            Navigator.push(
+          icon: const Icon(Icons.person, color: Colors.white),
+          onPressed: () async {
+            // Navigate to profile page and reset home page when returning
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) =>
                     ProfilePage(user: FirebaseAuth.instance.currentUser!),
               ),
             );
+            _resetHomePage(); // Reset home page when returning
           },
         ),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ), // Notifications icon
-            itemBuilder: (BuildContext context) {
-              return [
-                const PopupMenuItem<String>(
-                  value: 'header',
-                  child: Text(
-                    'Notifications',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem<String>(
+                value: 'header',
+                child: Text(
+                  'Notifications',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                const PopupMenuItem<String>(
-                  value: 'empty',
-                  child: Text('No new notifications.'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'empty',
+                child: Text('No new notifications.'),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'clear',
+                child: Row(
+                  children: const [
+                    Icon(Icons.delete, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Clear All', style: TextStyle(color: Colors.red)),
+                  ],
                 ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'clear',
-                  child: Row(
-                    children: const [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Clear All', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ];
-            },
+              ),
+            ],
             onSelected: (String value) {
               if (value == 'clear') {
-                _clearNotifications(); // Clear all notifications
+                _clearNotifications();
               }
             },
           ),
           IconButton(
-            icon: const Icon(
-              Icons.settings,
-              color: Colors.white,
-            ), // Settings icon
-            onPressed: () {
-              Navigator.push(
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () async {
+              // Navigate to settings page and reset home page when returning
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
                       SettingsPage(user: FirebaseAuth.instance.currentUser),
                 ),
               );
+              _resetHomePage(); // Reset home page when returning
             },
           ),
         ],
@@ -141,8 +191,8 @@ class _HomePageState extends State<HomePage> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color.fromRGBO(168, 64, 185, 1), // RGB 168, 64, 185
-                Color.fromRGBO(110, 59, 226, 1), // RGB 110, 59, 226
+                Color.fromRGBO(168, 64, 185, 1),
+                Color.fromRGBO(110, 59, 226, 1),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -150,84 +200,167 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      body: HomeContent(
-        searchRecipes: _searchRecipes,
-        recipes: _recipes,
-        isLoading: _isLoading,
-      ), // Pass data to HomeContent
+      body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex, // Current selected index
-        onTap: _onItemTapped, // Handle item taps
-        type: BottomNavigationBarType.fixed, // Fixed type for more than 3 items
-        items: const <BottomNavigationBarItem>[
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.create), label: 'Create'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book),
-            label: 'Recipes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Shop List',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Recipes'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Shop List'),
         ],
       ),
     );
   }
 }
 
-// Updated HomeContent widget
 class HomeContent extends StatelessWidget {
   final Function(String) searchRecipes;
+  final Function clearSearch;
+  final Function fetchRandomRecipes;
   final List<dynamic> recipes;
+  final List<dynamic> exploreRecipes;
   final bool isLoading;
+  final TextEditingController searchController;
+  final bool isSearching;
 
   const HomeContent({
     super.key,
     required this.searchRecipes,
+    required this.clearSearch,
     required this.recipes,
     required this.isLoading,
+    required this.searchController,
+    required this.exploreRecipes,
+    required this.fetchRandomRecipes,
+    required this.isSearching,
   });
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController _searchController = TextEditingController();
-
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search for recipes...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10.0),
+          // Search Bar with Search Icon Inside and Filter Button Outside
+          Row(
+            children: [
+              // Expanded Search Bar with Search Icon Inside
+              Expanded(
+                child: TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search for recipes...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey), // Search icon inside the bar
+                    suffixIcon: searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        searchController.clear();
+                        clearSearch();
+                      },
+                    ),
+                  ),
+                  onSubmitted: (query) {
+                    searchRecipes(query);
+                  },
+                ),
               ),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.search),
+              // Filter Button Outside Search Bar
+              IconButton(
+                icon: const Icon(Icons.filter_list),
                 onPressed: () {
-                  searchRecipes(_searchController.text); // Trigger search
+                  // Add filter functionality here later
                 },
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 16),
-          isLoading
-              ? const CircularProgressIndicator()
-              : Expanded(
-                  child: ListView.builder(
-                    itemCount: recipes.length,
-                    itemBuilder: (context, index) {
-                      final recipe = recipes[index];
-                      return ListTile(
-                        title: Text(recipe['title']),
-                        subtitle: Text('ID: ${recipe['id']}'),
-                      );
-                    },
-                  ),
+          if (!isSearching) // Only show "Explore Recipes" section when not searching
+            Column(
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Explore Recipes',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    // Filter Button next to Refresh
+                    IconButton(
+                      icon: const Icon(Icons.filter_list),
+                      onPressed: () {
+                        // Add filter functionality here later
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () => fetchRandomRecipes(),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          Expanded(
+      child: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : recipes.isEmpty
+              ? ListView.builder(
+                  itemCount: exploreRecipes.length,
+                  itemBuilder: (context, index) {
+                    final recipe = exploreRecipes[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: recipe['image'] != null
+                            ? Image.network(
+                                recipe['image'],
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.image_not_supported),
+                        title: Text(recipe['title']),
+                      ),
+                    );
+                  },
+                )
+              : ListView.builder(
+                  itemCount: recipes.length,
+                  itemBuilder: (context, index) {
+                    final recipe = recipes[index];
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: ListTile(
+                        leading: recipe['image'] != null
+                            ? Image.network(
+                                recipe['image'],
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.image_not_supported),
+                        title: Text(recipe['title']),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                              MaterialPageRoute(builder: (context) => RecipeDetailsPage(recipeId: recipe['id'])),
+                            );
+                        },
+                      ),
+                    );
+                  },
+                ),
+    ),
         ],
       ),
     );

@@ -6,13 +6,13 @@ import '/pages/shoplist_page.dart';
 import '/pages/create_page.dart';
 import '/pages/my_recipes_page.dart';
 import '/pages/settings_page.dart';
+import '/pages/meal_plans_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/Spoonacular_APi';
+import '../services/Spoonacular_API';
 import 'dart:math';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -20,7 +20,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Auth _auth = Auth();
   int _selectedIndex = 0;
-
   final SpoonacularService _spoonacularService = SpoonacularService();
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _recipes = [];
@@ -38,7 +37,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _isLoading = true;
     });
-
     final recipes = await _spoonacularService.getRandomRecipes();
     setState(() {
       _exploreRecipes = recipes;
@@ -58,12 +56,10 @@ class _HomePageState extends State<HomePage> {
 
   void _searchRecipes(String query) async {
     if (query.isEmpty) return;
-
     setState(() {
       _isLoading = true;
       _isSearching = true;
     });
-
     try {
       final recipes = await _spoonacularService.searchRecipes(query);
       setState(() {
@@ -85,12 +81,6 @@ class _HomePageState extends State<HomePage> {
       _isSearching = false;
       _fetchRandomRecipes();
     });
-  }
-
-  void _clearNotifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('All notifications cleared.')),
-    );
   }
 
   void _resetHomePage() {
@@ -115,9 +105,9 @@ class _HomePageState extends State<HomePage> {
         fetchRandomRecipes: _fetchRandomRecipes,
         isSearching: _isSearching,
       ),
-      CreatePage(),
       MyRecipesPage(),
       ShopListPage(),
+      MealPlansPage(), // Added Meal Plans page
     ];
 
     return Scaffold(
@@ -135,39 +125,12 @@ class _HomePageState extends State<HomePage> {
             _resetHomePage();
           },
         ),
+        title: const Text(
+          'RecipEasy',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem<String>(
-                value: 'header',
-                child: Text(
-                  'Notifications',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-              const PopupMenuItem<String>(
-                value: 'empty',
-                child: Text('No new notifications.'),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'clear',
-                child: Row(
-                  children: const [
-                    Icon(Icons.delete, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Clear All', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-            onSelected: (String value) {
-              if (value == 'clear') {
-                _clearNotifications();
-              }
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.settings, color: Colors.white),
             onPressed: () async {
@@ -202,10 +165,11 @@ class _HomePageState extends State<HomePage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.create), label: 'Create'),
           BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Recipes'),
           BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart), label: 'Shop List'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu), label: 'Meal Plans'), // Added Meal Plans
         ],
       ),
     );
@@ -266,12 +230,6 @@ class HomeContent extends StatelessWidget {
                   },
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                onPressed: () {
-                  // Add filter functionality here later
-                },
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -285,12 +243,6 @@ class HomeContent extends StatelessWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.filter_list),
-                      onPressed: () {
-                        // Add filter functionality here later
-                      },
-                    ),
                     IconButton(
                       icon: const Icon(Icons.refresh),
                       onPressed: () => fetchRandomRecipes(),
@@ -314,7 +266,8 @@ class HomeContent extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
-                    leading: recipe['image'] != null && recipe['image'].isNotEmpty
+                    leading: recipe['image'] != null &&
+                        recipe['image'].isNotEmpty
                         ? Image.network(
                       recipe['image'],
                       width: 50,

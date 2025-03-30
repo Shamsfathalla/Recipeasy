@@ -1,187 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '/auth.dart'; // Import your Auth class
-import '/pages/profile_page.dart';
-import '/pages/shoplist_page.dart';
-import '/pages/create_page.dart';
-import '/pages/my_recipes_page.dart';
 import '/theme_provider.dart';
 import 'package:provider/provider.dart';
 import '../pages/login_register_page.dart';
 
-class HomePage extends StatefulWidget {
-  final User? user;
-
-  const HomePage({super.key, required this.user});
-
-  @override
-  _HomePageState createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  final Auth _auth = Auth();
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = [
-    const HomeContent(),
-    CreatePage(),
-    MyRecipesPage(),
-    ShopListPage(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  void _clearNotifications(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('All notifications cleared.')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.person,
-            color: Colors.white,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ProfilePage(user: FirebaseAuth.instance.currentUser!),
-              ),
-            );
-          },
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ),
-            itemBuilder: (BuildContext context) {
-              return [
-                PopupMenuItem<String>(
-                  value: 'header',
-                  child: Text(
-                    'Notifications',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'empty',
-                  child: Text('No new notifications.'),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'clear',
-                  child: Row(
-                    children: const [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Clear All', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ];
-            },
-            onSelected: (String value) {
-              if (value == 'clear') {
-                _clearNotifications(context);
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.settings,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SettingsPage(user: widget.user),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home, color: Color.fromRGBO(110, 59, 226, 1)),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.create, color: Color.fromRGBO(110, 59, 226, 1)),
-            label: 'Create',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu_book, color: Color.fromRGBO(110, 59, 226, 1)),
-            label: 'Recipes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.shopping_cart,
-              color: Color.fromRGBO(110, 59, 226, 1),
-            ),
-            label: 'Shop List',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(
-              Icons.more_horiz,
-              color: Color.fromRGBO(110, 59, 226, 1),
-            ),
-            label: 'More',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class HomeContent extends StatelessWidget {
-  const HomeContent({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
-        child: TextField(
-          decoration: InputDecoration(
-            hintText: 'Search...',
-            prefixIcon: const Icon(Icons.search),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class SettingsPage extends StatelessWidget {
   final User? user;
-
   const SettingsPage({super.key, required this.user});
 
   @override
@@ -192,6 +16,7 @@ class SettingsPage extends StatelessWidget {
           'Settings',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
             color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
@@ -286,37 +111,34 @@ class SettingsPage extends StatelessWidget {
     child: ElevatedButton.icon(
       icon: const Icon(Icons.logout),
       label: const Text('Sign Out'),
-        onPressed: () async {
-          final confirm = await showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Sign Out'),
-              content: const Text('Are you sure you want to sign out?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Sign Out'),
-                ),
-              ],
-            ),
+      onPressed: () async {
+        final confirm = await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Sign Out'),
+            content: const Text('Are you sure you want to sign out?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Sign Out'),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true) {
+          await FirebaseAuth.instance.signOut();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => LoginPage()),
+                (route) => false,
           );
-
-          if (confirm == true) {
-            await FirebaseAuth.instance.signOut(); // ✅ Ensure Firebase Auth signs out
-
-            // ✅ Instead of navigating manually, let StreamBuilder detect the auth change
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => LoginPage()),
-                  (route) => false, // Clear all previous routes
-            );
-          }
         }
-    )
-    );
+      },
+    ),
+  );
 
   Widget _buildCard(List<Widget> children) => Card(
     margin: const EdgeInsets.all(16),
@@ -346,7 +168,6 @@ class SettingsPage extends StatelessWidget {
     onTap: onTap,
   );
 
-  // ... (keep all the remaining methods unchanged)
   Future<void> _changeEmail(BuildContext context) async {
     final newEmail = await _showInputDialog(
       context,
@@ -391,9 +212,7 @@ class SettingsPage extends StatelessWidget {
       final oldPassword = result['oldPassword'];
       final newPassword = result['newPassword'];
       final confirmPassword = result['confirmPassword'];
-
       if (newPassword != null && confirmPassword != null && newPassword == confirmPassword) {
-        // Re-authenticate the user
         try {
           final credential = EmailAuthProvider.credential(
             email: user?.email ?? '',
@@ -406,7 +225,6 @@ class SettingsPage extends StatelessWidget {
           );
           return;
         }
-
         try {
           await user?.updatePassword(newPassword);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -478,7 +296,6 @@ class SettingsPage extends StatelessWidget {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
-
     return showDialog<Map<String, String>>(
       context: context,
       builder: (context) => AlertDialog(
@@ -527,14 +344,12 @@ class SettingsPage extends StatelessWidget {
               final oldPassword = oldPasswordController.text.trim();
               final newPassword = newPasswordController.text.trim();
               final confirmPassword = confirmPasswordController.text.trim();
-
               if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please fill in all fields.')),
                 );
                 return;
               }
-
               Navigator.pop(context, {
                 'oldPassword': oldPassword,
                 'newPassword': newPassword,

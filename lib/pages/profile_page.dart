@@ -8,13 +8,6 @@ class ProfilePage extends StatelessWidget {
 
   const ProfilePage({Key? key, required this.user}) : super(key: key);
 
-  // Function to clear all notifications (UI-only for now)
-  void _clearNotifications(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All notifications cleared.'))
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -27,6 +20,7 @@ class ProfilePage extends StatelessWidget {
           'Profile',
           style: theme.textTheme.titleLarge?.copyWith(
             color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
@@ -47,51 +41,6 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ),
-            itemBuilder: (BuildContext context) {
-              return [
-                PopupMenuItem<String>(
-                  value: 'header',
-                  child: Text(
-                    'Notifications',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'empty',
-                  child: Text(
-                    'No new notifications.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: 'clear',
-                  child: Row(
-                    children: const [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Clear All', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ];
-            },
-            onSelected: (String value) {
-              if (value == 'clear') {
-                _clearNotifications(context);
-              }
-            },
-          ),
           IconButton(
             icon: const Icon(
               Icons.settings,

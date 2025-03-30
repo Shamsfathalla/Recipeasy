@@ -16,6 +16,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isBookmarked = false;
+  int _currentSectionIndex = 0; // 0: About, 1: Ingredients, 2: Instructions, 3: Nutrition
 
   @override
   void initState() {
@@ -51,6 +52,15 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
       SnackBar(
         content: Text(_isBookmarked ? 'Recipe bookmarked!' : 'Bookmark removed'),
         duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _showShareUI() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Share functionality would appear here'),
+        duration: Duration(seconds: 1),
       ),
     );
   }
@@ -97,13 +107,13 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
 
   Widget _buildSectionTitle(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: const Color.fromRGBO(110, 59, 226, 1), // Purple color
+          color: const Color.fromRGBO(110, 59, 226, 1),
         ),
       ),
     );
@@ -130,7 +140,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 6, right: 8),
-            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(110, 59, 226, 1)), // Purple color
+            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(110, 59, 226, 1)),
           ),
           Expanded(
             child: Text(
@@ -143,11 +153,174 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     );
   }
 
+  Widget _buildAboutSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('About this recipe'),
+        if (_recipeDetails!['spoonacularScore'] != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                const Icon(Icons.star, color: Colors.amber, size: 20),
+                const SizedBox(width: 4),
+                Text(
+                  'Spoonacular Score: ${_recipeDetails!['spoonacularScore']}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        _buildTextContent(
+          _recipeDetails!['summary'].replaceAll(RegExp(r'<[^>]*>'), ''),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIngredientsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Ingredients'),
+        ..._recipeDetails!['extendedIngredients']
+            .map<Widget>((ingredient) => _buildIngredientItem(ingredient['original']))
+            .toList(),
+      ],
+    );
+  }
+
+  Widget _buildInstructionsSection() {
+    // Clean up instructions by splitting into steps
+    String rawInstructions = _recipeDetails!['instructions'] ?? '';
+    String cleanedInstructions = rawInstructions.replaceAll(RegExp(r'<[^>]*>'), '');
+
+    // Split instructions into steps (assuming they're numbered or separated by newlines)
+    List<String> instructionSteps = cleanedInstructions.split('\n').where((step) => step.trim().isNotEmpty).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Instructions'),
+        if (instructionSteps.isEmpty)
+          _buildTextContent('No instructions available.')
+        else
+          ...instructionSteps.map((step) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 12, top: 4),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(110, 59, 226, 1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${instructionSteps.indexOf(step) + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      step.trim(),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildNutritionSection() {
+    if (_recipeDetails!['nutrition'] == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionTitle('Nutrition Information'),
+          _buildTextContent('No nutrition information available.'),
+        ],
+      );
+    }
+
+    final nutrition = _recipeDetails!['nutrition'];
+    final nutrients = nutrition['nutrients'] as List<dynamic>?;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle('Nutrition Information'),
+        if (nutrients == null || nutrients.isEmpty)
+          _buildTextContent('No nutrition data available.')
+        else
+          Column(
+            children: nutrients.map((nutrient) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        nutrient['name'],
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        '${nutrient['amount']?.toStringAsFixed(1) ?? 'N/A'} ${nutrient['unit'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCurrentSection() {
+    if (_recipeDetails == null) return const SizedBox();
+
+    switch (_currentSectionIndex) {
+      case 0:
+        return _buildAboutSection();
+      case 1:
+        return _buildIngredientsSection();
+      case 2:
+        return _buildInstructionsSection();
+      case 3:
+        return _buildNutritionSection();
+      default:
+        return _buildAboutSection();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_recipeDetails?['title'] ?? 'Recipe Details'),
+        title: const Text('Recipe Details'),
         elevation: 0,
       ),
       body: _isLoading
@@ -165,7 +338,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               onPressed: _fetchRecipeDetails,
               style: ElevatedButton.styleFrom(
                 foregroundColor: Colors.white,
-                backgroundColor: const Color.fromRGBO(110, 59, 226, 1), // Purple color
+                backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
               ),
               child: const Text('Retry'),
             ),
@@ -179,11 +352,10 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
           children: [
             if (_recipeDetails!['image'] != null) _buildImageSection(),
 
-            // Title and Bookmark
+            // Title and Action Buttons
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Text(
@@ -197,59 +369,59 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                     ),
                   ),
                   IconButton(
+                    icon: const Icon(Icons.share),
+                    onPressed: _showShareUI,
+                    tooltip: 'Share recipe',
+                  ),
+                  IconButton(
                     icon: Icon(
                       _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                       color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey[600],
-                      size: 30,
                     ),
                     onPressed: _toggleBookmark,
+                    tooltip: 'Bookmark recipe',
                   ),
                 ],
               ),
             ),
 
-            // Description
-            if (_recipeDetails!.containsKey('summary'))
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Navigation Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildSectionTitle('About this recipe'),
-                  _buildTextContent(
-                    _recipeDetails!['summary'].replaceAll(RegExp(r'<[^>]*>'), ''),
-                  ),
-                  const Divider(height: 24),
+                  _buildNavButton('About', 0),
+                  _buildNavButton('Ingredients', 1),
+                  _buildNavButton('Instructions', 2),
+                  _buildNavButton('Nutrition', 3),
                 ],
               ),
+            ),
 
-            // Ingredients
-            if (_recipeDetails!.containsKey('extendedIngredients'))
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle('Ingredients'),
-                  ..._recipeDetails!['extendedIngredients']
-                      .map<Widget>((ingredient) => _buildIngredientItem(ingredient['original']))
-                      .toList(),
-                  const Divider(height: 24),
-                ],
-              ),
-
-            // Instructions
-            if (_recipeDetails!.containsKey('instructions') &&
-                _recipeDetails!['instructions'] != null &&
-                _recipeDetails!['instructions'].isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle('Instructions'),
-                  _buildTextContent(
-                    _recipeDetails!['instructions'].replaceAll(RegExp(r'<[^>]*>'), ''),
-                  ),
-                ],
-              ),
+            // Current Section Content
+            _buildCurrentSection(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNavButton(String text, int index) {
+    final isSelected = _currentSectionIndex == index;
+    return TextButton(
+      onPressed: () {
+        setState(() {
+          _currentSectionIndex = index;
+        });
+      },
+      style: TextButton.styleFrom(
+        foregroundColor: isSelected ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+        textStyle: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      child: Text(text),
     );
   }
 }

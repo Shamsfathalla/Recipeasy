@@ -8,7 +8,7 @@ class MyRecipesPage extends StatelessWidget {
       initialIndex: 0, // Start with bookmarks selected
       child: Scaffold(
         appBar: PreferredSize(
-          preferredSize: Size.fromHeight(48), // Reduce height to minimize gap
+          preferredSize: Size.fromHeight(kToolbarHeight), // Reduce height to minimize gap
           child: AppBar(
             automaticallyImplyLeading: false, // Remove the back button
             backgroundColor: Colors.transparent, // Make the app bar transparent

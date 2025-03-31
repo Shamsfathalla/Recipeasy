@@ -57,7 +57,7 @@ class SettingsPage extends StatelessWidget {
       'Account Settings',
       user?.email ?? 'No email associated',
     ),
-    _buildSettingsOption(context, Icons.email, 'Change Email', () => _changeEmail(context)),
+
     _buildSettingsOption(context, Icons.lock, 'Change Password', () => _changePassword(context)),
     _buildSettingsOption(context, Icons.delete, 'Delete Account', () => _deleteAccount(context)),
   ]);
@@ -107,7 +107,7 @@ class SettingsPage extends StatelessWidget {
   ]);
 
   Widget _buildSignOutButton(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(20),
+    padding: const EdgeInsets.all(0),
     child: ElevatedButton.icon(
       icon: const Icon(Icons.logout),
       label: const Text('Sign Out'),
@@ -168,44 +168,6 @@ class SettingsPage extends StatelessWidget {
     onTap: onTap,
   );
 
-  Future<void> _changeEmail(BuildContext context) async {
-    final newEmail = await _showInputDialog(
-      context,
-      'Change Email',
-      'Enter new email',
-      confirmHint: 'Confirm new email',
-    );
-    if (newEmail != null && newEmail.isNotEmpty) {
-      final confirmEmail = await _showInputDialog(
-        context,
-        'Confirm Email',
-        'Re-enter new email',
-      );
-      if (confirmEmail != null && confirmEmail == newEmail) {
-        try {
-          await user?.updateEmail(newEmail);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Email updated successfully!')),
-          );
-        } on FirebaseAuthException catch (e) {
-          String errorMessage = 'An error occurred. Please try again.';
-          if (e.code == 'email-already-in-use') {
-            errorMessage = 'The email address is already in use by another account.';
-          } else if (e.code == 'requires-recent-login') {
-            errorMessage = 'Please re-authenticate to change your email.';
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMessage)),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Emails do not match. Please try again.')),
-        );
-      }
-    }
-  }
-
   Future<void> _changePassword(BuildContext context) async {
     final result = await _showPasswordChangeDialog(context);
     if (result != null) {
@@ -262,31 +224,54 @@ class SettingsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Delete',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text('Delete'),
           ),
         ],
       ),
     );
+
     if (confirm == true) {
       try {
-        await user?.delete();
+        // Ask for password to reauthenticate
+        final password = await _showInputDialog(
+          context,
+          'Reauthenticate',
+          'Enter your password',
+          isPassword: true,
+        );
+        if (password == null || password.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Password is required for security.')),
+          );
+          return;
+        }
+
+        // Reauthenticate user before deleting
+        final credential = EmailAuthProvider.credential(email: user!.email!, password: password);
+        await user!.reauthenticateWithCredential(credential);
+
+        // Delete the user
+        await user!.delete();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account deleted successfully!')),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+
+        // Navigate back to login
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => LoginPage()),
+              (route) => false,
+        );
       } on FirebaseAuthException catch (e) {
+        String errorMessage = 'Error deleting account: ${e.message}';
+        if (e.code == 'requires-recent-login') {
+          errorMessage = 'You need to log in again before deleting your account.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting account: ${e.message}')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     }

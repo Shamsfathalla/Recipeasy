@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth.dart';
 import '../pages/home_page.dart';
 
@@ -17,17 +18,25 @@ class _LoginPageState extends State<LoginPage> {
   bool showForgotPassword = false;
   String headerText = "Welcome";
   String forgotPasswordMessage = '';
+  bool isCheckingUsername = false;
+  bool isLoading = false;
+  bool showRegistrationSuccess = false;
 
-  // Color constants
-  final Color iconColor = Colors.blueAccent;
-  final Color purpleTextColor = Colors.deepPurple;
-  final Color accentButtonColor = Colors.blueAccent;
-
-  final TextEditingController _controllerName = TextEditingController();
+  final TextEditingController _controllerUsername = TextEditingController();
   final TextEditingController _controllerEmail = TextEditingController();
   final TextEditingController _controllerPassword = TextEditingController();
   final TextEditingController _controllerConfirmPassword = TextEditingController();
   final TextEditingController _controllerForgotPasswordEmail = TextEditingController();
+
+  @override
+  void dispose() {
+    _controllerUsername.dispose();
+    _controllerEmail.dispose();
+    _controllerPassword.dispose();
+    _controllerConfirmPassword.dispose();
+    _controllerForgotPasswordEmail.dispose();
+    super.dispose();
+  }
 
   void _clearPasswordField() {
     _controllerPassword.clear();
@@ -35,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _clearTextControllers() {
-    _controllerName.clear();
+    _controllerUsername.clear();
     _controllerEmail.clear();
     _controllerPassword.clear();
     _controllerConfirmPassword.clear();
@@ -48,23 +57,30 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    setState(() => isLoading = true);
+
     try {
       await Auth().signInWithEmailAndPassword(
         email: _controllerEmail.text,
         password: _controllerPassword.text,
       );
-      setState(() => errorMessage = '');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => HomePage()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       setState(() => errorMessage = e.message ?? 'An error occurred');
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
   Future<void> createUserWithEmailAndPassword() async {
-    if (_controllerName.text.isEmpty ||
+    if (_controllerUsername.text.isEmpty ||
         _controllerEmail.text.isEmpty ||
         _controllerPassword.text.isEmpty ||
         _controllerConfirmPassword.text.isEmpty) {
@@ -77,25 +93,63 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    if (!RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(_controllerUsername.text)) {
+      setState(() => errorMessage = 'Username must be 3-20 characters (letters, numbers, _)');
+      return;
+    }
+
+    setState(() {
+      isCheckingUsername = true;
+      isLoading = true;
+      showRegistrationSuccess = false;
+    });
+
     try {
+      final isAvailable = await Auth().isUsernameAvailable(_controllerUsername.text);
+      if (!isAvailable) {
+        setState(() {
+          errorMessage = 'Username is already taken';
+          isCheckingUsername = false;
+          isLoading = false;
+        });
+        return;
+      }
+
       await Auth().createUserWithEmailAndPassword(
         email: _controllerEmail.text,
         password: _controllerPassword.text,
+        username: _controllerUsername.text,
       );
+
       setState(() {
-        errorMessage = 'Sign up successful! Please sign in.';
-        // Copy email to sign-in form before clearing
-        final signedUpEmail = _controllerEmail.text;
-        _clearTextControllers();
-        _controllerEmail.text = signedUpEmail; // Set the email in sign-in form
+        showRegistrationSuccess = true;
+        errorMessage = 'Registration successful! Please sign in.';
+        _controllerPassword.clear();
+        _controllerConfirmPassword.clear();
         isLogin = true;
-        headerText = "Hello, sign in";
+        headerText = "Sign in to continue";
       });
+
+      await Future.delayed(const Duration(seconds: 3));
+      if (mounted) {
+        setState(() => showRegistrationSuccess = false);
+      }
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        setState(() => errorMessage = 'The email address is already in use by another account.');
-      } else {
-        setState(() => errorMessage = e.message ?? 'An error occurred');
+      setState(() {
+        if (e.code == 'email-already-in-use') {
+          errorMessage = 'Email already in use';
+        } else if (e.code == 'weak-password') {
+          errorMessage = 'Password should be at least 6 characters';
+        } else {
+          errorMessage = e.message ?? 'Registration failed';
+        }
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isCheckingUsername = false;
+          isLoading = false;
+        });
       }
     }
   }
@@ -104,16 +158,55 @@ class _LoginPageState extends State<LoginPage> {
       String hintText,
       TextEditingController controller,
       IconData icon,
-      bool isPassword,
-      ) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        hintText: hintText,
-        prefixIcon: Icon(icon, color: iconColor),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+      bool isPassword, {
+        bool showAvailability = false,
+      }) {
+    return Column(
+      children: [
+        TextField(
+          controller: controller,
+          obscureText: isPassword,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onChanged: (value) {
+            if (showAvailability && !isLogin) {
+              setState(() {});
+            }
+          },
+        ),
+        if (showAvailability && !isLogin && controller.text.isNotEmpty)
+          FutureBuilder<bool>(
+            future: Auth().isUsernameAvailable(controller.text),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.only(top: 4.0),
+                  child: SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                );
+              }
+              if (snapshot.hasData) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    snapshot.data! ? '✓ Available' : '✗ Taken',
+                    style: TextStyle(
+                      color: snapshot.data! ? Colors.green : Colors.red,
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox();
+            },
+          ),
+      ],
     );
   }
 
@@ -123,7 +216,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Text(
         errorMessage,
         style: TextStyle(
-          color: errorMessage.contains('success') ? Colors.green : Colors.red,
+          color: errorMessage.toLowerCase().contains('success') ? Colors.green : Colors.red,
           fontSize: 14,
         ),
         textAlign: TextAlign.center,
@@ -136,15 +229,21 @@ class _LoginPageState extends State<LoginPage> {
       width: double.infinity,
       height: 55,
       child: ElevatedButton(
-        onPressed: isLogin ? signInWithEmailAndPassword : createUserWithEmailAndPassword,
+        onPressed: isLoading ? null : isLogin ? signInWithEmailAndPassword : createUserWithEmailAndPassword,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          foregroundColor: Theme.of(context).textTheme.bodyMedium?.color,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: EdgeInsets.zero,
           textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        child: Text(isLogin ? 'Sign in' : 'Sign up'),
+        child: isLoading
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+            : Text(isLogin ? 'Sign in' : 'Sign up'),
       ),
     );
   }
@@ -161,7 +260,10 @@ class _LoginPageState extends State<LoginPage> {
       },
       child: Text(
         'Forgot Password?',
-        style: TextStyle(color: accentButtonColor, fontSize: 16),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontSize: 16,
+        ),
       ),
     );
   }
@@ -172,10 +274,13 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Text(
           'Not signed up? ',
-          style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
+          style: TextStyle(
+            fontSize: 16,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
         ),
         TextButton(
-          onPressed: () {
+          onPressed: isLoading ? null : () {
             setState(() {
               isLogin = false;
               headerText = "Create your account";
@@ -184,7 +289,10 @@ class _LoginPageState extends State<LoginPage> {
           },
           child: Text(
             'Sign up',
-            style: TextStyle(fontSize: 16, color: accentButtonColor),
+            style: TextStyle(
+              fontSize: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
         ),
       ],
@@ -196,20 +304,26 @@ class _LoginPageState extends State<LoginPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Already signed up? ',
-          style: TextStyle(fontSize: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
+          'Already have an account? ',
+          style: TextStyle(
+            fontSize: 16,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
         ),
         TextButton(
-          onPressed: () {
+          onPressed: isLoading ? null : () {
             setState(() {
               isLogin = true;
-              headerText = "Hello, sign in";
+              headerText = "Welcome back";
               _clearTextControllers();
             });
           },
           child: Text(
             'Sign in',
-            style: TextStyle(fontSize: 16, color: accentButtonColor),
+            style: TextStyle(
+              fontSize: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
         ),
       ],
@@ -279,16 +393,17 @@ class _LoginPageState extends State<LoginPage> {
 
                   try {
                     await Auth().sendPasswordResetEmail(_controllerForgotPasswordEmail.text);
-                    setState(() => forgotPasswordMessage = 'Password reset link sent! Check your inbox.');
+                    setState(() => forgotPasswordMessage = 'Reset link sent! Check your email.');
                   } on FirebaseAuthException catch (e) {
-                    setState(() => forgotPasswordMessage = e.code == 'user-not-found'
-                        ? 'Error: No user found with this email.'
+                    setState(() => forgotPasswordMessage =
+                    e.code == 'user-not-found'
+                        ? 'No account found with this email'
                         : 'Error: ${e.message}');
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.surface,
-                  foregroundColor: Theme.of(context).textTheme.bodyMedium?.color,
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
                 child: const Text('Send Reset Link'),
               ),
@@ -303,8 +418,52 @@ class _LoginPageState extends State<LoginPage> {
                 },
                 child: Text(
                   'Back to Sign In',
-                  style: TextStyle(color: accentButtonColor, fontSize: 16),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: 16,
+                  ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuccessMessage() {
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 300),
+      bottom: showRegistrationSuccess ? 50 : -100,
+      left: 20,
+      right: 20,
+      child: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Account created successfully!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () {
+                  setState(() => showRegistrationSuccess = false);
+                },
               ),
             ],
           ),
@@ -320,18 +479,18 @@ class _LoginPageState extends State<LoginPage> {
       firstChild: Column(
         children: [
           Text(
-            'Welcome Back',
+            'Sign In',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Theme.of(context).textTheme.titleLarge?.color,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           _entryField('Email', _controllerEmail, Icons.email, false),
           const SizedBox(height: 15),
           _entryField('Password', _controllerPassword, Icons.lock, true),
+          const SizedBox(height: 10),
           _errorMessage(),
           _submitButton(),
           _forgotPasswordButton(),
@@ -341,22 +500,22 @@ class _LoginPageState extends State<LoginPage> {
       secondChild: Column(
         children: [
           Text(
-            'Create your Account',
+            'Create Account',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Theme.of(context).textTheme.titleLarge?.color,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          _entryField('Name', _controllerName, Icons.person, false),
+          _entryField('Username', _controllerUsername, Icons.person, false, showAvailability: true),
           const SizedBox(height: 15),
           _entryField('Email', _controllerEmail, Icons.email, false),
           const SizedBox(height: 15),
           _entryField('Password', _controllerPassword, Icons.lock, true),
           const SizedBox(height: 15),
           _entryField('Confirm Password', _controllerConfirmPassword, Icons.lock, true),
+          const SizedBox(height: 10),
           _errorMessage(),
           _submitButton(),
           _alreadySignedUpButton(),
@@ -439,7 +598,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.surface,
-                            foregroundColor: purpleTextColor,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: EdgeInsets.zero,
                             textStyle: const TextStyle(
@@ -464,7 +623,7 @@ class _LoginPageState extends State<LoginPage> {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).colorScheme.surface,
-                            foregroundColor: purpleTextColor,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             padding: EdgeInsets.zero,
                             textStyle: const TextStyle(
@@ -511,6 +670,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
 
               _forgotPasswordBox(),
+              _buildSuccessMessage(),
             ],
           ),
         ],

@@ -107,7 +107,7 @@ class _HomePageState extends State<HomePage> {
       ),
       MyRecipesPage(),
       ShopListPage(),
-      MealPlansPage(), // Added Meal Plans page
+      MealPlansPage(userId: FirebaseAuth.instance.currentUser?.uid ?? ''), // Added Meal Plans page
     ];
 
     return Scaffold(

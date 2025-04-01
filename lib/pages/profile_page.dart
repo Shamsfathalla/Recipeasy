@@ -1,12 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../auth.dart'; // Import Auth class
-import '/pages/settings_page.dart'; // Import SettingsPage
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../auth.dart';
+import '/pages/settings_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   final User user;
 
   const ProfilePage({Key? key, required this.user}) : super(key: key);
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String? username;
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsername();
+  }
+
+  Future<void> _loadUsername() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.user.uid)
+          .get();
+
+      if (mounted) {
+        setState(() {
+          if (doc.exists) {
+            username = doc.data()?['username'] ?? '@${widget.user.displayName ?? 'user'}';
+          } else {
+            username = '@${widget.user.displayName ?? 'user'}';
+          }
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          username = '@${widget.user.displayName ?? 'user'}';
+          isLoading = false;
+          errorMessage = 'Could not load username';
+        });
+      }
+      debugPrint('Error loading username: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +60,7 @@ class ProfilePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: true, // Adds a back button
+        automaticallyImplyLeading: true,
         title: Text(
           'Profile',
           style: theme.textTheme.titleLarge?.copyWith(
@@ -50,7 +95,7 @@ class ProfilePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => SettingsPage(user: user),
+                  builder: (context) => SettingsPage(user: widget.user),
                 ),
               );
             },
@@ -59,9 +104,21 @@ class ProfilePage extends StatelessWidget {
       ),
       body: Container(
         color: theme.scaffoldBackgroundColor,
-        child: SingleChildScrollView(
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
           child: Column(
             children: [
+              if (errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    errorMessage!,
+                    style: TextStyle(
+                      color: Colors.red[400],
+                    ),
+                  ),
+                ),
               _buildProfileHeader(context),
               _buildStatsRow(context),
               _buildFriendsSection(context),
@@ -81,7 +138,7 @@ class ProfilePage extends StatelessWidget {
       color: theme.cardColor,
       child: Column(
         children: [
-          const SizedBox(height: 20), // Additional space above the avatar
+          const SizedBox(height: 20),
           const CircleAvatar(
             radius: 40,
             backgroundColor: Color.fromRGBO(110, 59, 226, 1),
@@ -93,7 +150,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 1),
           Text(
-            user.displayName ?? 'User Name',
+            username ?? '@user',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: isDarkMode ? Colors.white : Colors.black,
@@ -101,7 +158,7 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            user.email ?? 'No email provided',
+            widget.user.email ?? '',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: isDarkMode ? Colors.white70 : Colors.black87,
             ),
@@ -202,13 +259,11 @@ class ProfilePage extends StatelessWidget {
                 color: isDarkMode ? Colors.white : Colors.black,
               ),
             ),
-            trailing: const IconButton(
-              icon: Icon(Icons.remove_circle, color: Colors.red),
-              onPressed: null,
+            trailing: IconButton(
+              icon: const Icon(Icons.remove_circle, color: Colors.red),
+              onPressed: () => _removeFriend(friends[index]),
             ),
-            onTap: () {
-              _viewFriendProfile(friends[index]);
-            },
+            onTap: () => _viewFriendProfile(friends[index]),
           ),
         );
       },
@@ -234,14 +289,17 @@ class ProfilePage extends StatelessWidget {
   }
 
   void _addFriend() {
-    print('Add Friend');
+    debugPrint('Add Friend');
+    // Implement add friend functionality
   }
 
   void _removeFriend(String friendName) {
-    print('Removed $friendName');
+    debugPrint('Removed $friendName');
+    // Implement remove friend functionality
   }
 
   void _viewFriendProfile(String friendName) {
-    print('View $friendName\'s profile');
+    debugPrint('View $friendName\'s profile');
+    // Implement view friend profile functionality
   }
 }

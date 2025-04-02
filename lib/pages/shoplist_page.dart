@@ -7,9 +7,34 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Color.fromRGBO(110, 59, 226, 1);
+
     return MaterialApp(
       theme: ThemeData(
-        primaryColor: Color.fromRGBO(110, 59, 226, 1),
+        primaryColor: primaryColor,
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.white,
+          titleTextStyle: TextStyle(color: Colors.black),
+          iconTheme: IconThemeData(color: Colors.black),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      darkTheme: ThemeData(
+        primaryColor: primaryColor,
+        scaffoldBackgroundColor: Colors.grey[900],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.grey[900],
+          titleTextStyle: TextStyle(color: Colors.white),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+        ),
       ),
       home: ShopListPage(),
     );
@@ -24,6 +49,7 @@ class ShopListPage extends StatefulWidget {
 class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _showFab = true;
+  final primaryColor = Color.fromRGBO(110, 59, 226, 1);
 
   @override
   void initState() {
@@ -51,10 +77,17 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(kToolbarHeight),
         child: AppBar(
-          backgroundColor: Theme.of(context).primaryColor,
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
           bottom: TabBar(
             controller: _tabController,
             isScrollable: false,
+            indicatorColor: primaryColor,
+            labelColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : primaryColor,
+            unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey[400]
+                : Colors.grey[700],
             tabs: [
               Tab(text: 'Current List'),
               Tab(text: 'History'),
@@ -72,10 +105,10 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
       floatingActionButton: _showFab
           ? FloatingActionButton(
         onPressed: () {
-          // Implement add item functionality here
+          // Add item functionality
         },
-        child: Icon(Icons.add),
-        backgroundColor: Color.fromRGBO(110, 59, 226, 1),
+        child: Icon(Icons.add, color: Colors.white),
+        backgroundColor: primaryColor,
       )
           : null,
     );
@@ -108,7 +141,9 @@ class _CurrentShopListState extends State<CurrentShopList> {
       itemCount: shopItems.length,
       itemBuilder: (context, index) {
         return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
           elevation: 3.0,
           margin: EdgeInsets.symmetric(vertical: 6.0),
           child: ListTile(
@@ -120,7 +155,14 @@ class _CurrentShopListState extends State<CurrentShopList> {
                 });
               },
             ),
-            title: Text(shopItems[index]['name']),
+            title: Text(
+              shopItems[index]['name'],
+              style: TextStyle(
+                decoration: shopItems[index]['checked']
+                    ? TextDecoration.lineThrough
+                    : TextDecoration.none,
+              ),
+            ),
             trailing: IconButton(
               icon: Icon(Icons.delete, color: Colors.red),
               onPressed: () {
@@ -138,22 +180,41 @@ class _CurrentShopListState extends State<CurrentShopList> {
 
 class HistoryShopList extends StatelessWidget {
   final List<String> historyItems = [
-    'Flour', 'Sugar', 'Eggs', 'Milk', 'Butter', 'Salt', 'Pepper', 'Olive Oil', 'Tomatoes', 'Onions'
+    'Flour', 'Sugar', 'Eggs', 'Milk', 'Butter',
+    'Salt', 'Pepper', 'Olive Oil', 'Tomatoes', 'Onions'
   ];
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Color.fromRGBO(110, 59, 226, 1);
+
     return ListView.builder(
       padding: EdgeInsets.all(10.0),
       itemCount: historyItems.length,
       itemBuilder: (context, index) {
         return Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
           elevation: 3.0,
           margin: EdgeInsets.symmetric(vertical: 6.0),
           child: ListTile(
-            leading: Icon(Icons.history, color: Color.fromRGBO(110, 59, 226, 1)),
+            leading: Icon(
+              Icons.history,
+              color: Theme.of(context).iconTheme.color,
+            ),
             title: Text(historyItems[index]),
+            trailing: IconButton(
+              icon: Icon(Icons.add, color: primaryColor),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Added ${historyItems[index]} to current list'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
           ),
         );
       },

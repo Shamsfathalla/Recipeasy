@@ -18,56 +18,74 @@ class Auth {
     );
   }
 
-  Future<void> createUserWithEmailAndPassword({
+  Future<String> createUserWithEmailAndPassword({
     required String email,
     required String password,
     required String username,
   }) async {
-    // Validate username format first
-    if (!RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(username)) {
+    try {
+      // Validate username format first
+      if (!RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(username)) {
+        throw FirebaseAuthException(
+          code: 'invalid-username',
+          message: 'Username must be 3-20 characters (letters, numbers, _)',
+        );
+      }
+
+      // Check username availability
+      final usernameDoc = await _firestore.collection('usernames').doc(username).get();
+      if (usernameDoc.exists) {
+        throw FirebaseAuthException(
+          code: 'username-exists',
+          message: 'Username already taken',
+        );
+      }
+
+      // Create the user (this will automatically sign them in)
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = userCredential.user;
+      if (user == null) throw Exception('User creation failed');
+
+      // Batch write for atomic operations
+      final batch = _firestore.batch();
+
+      // Create user document with all required fields
+      batch.set(_firestore.collection('users').doc(user.uid), {
+        'email': email,
+        'username': username,
+        'followersCount': 0,
+        'followingCount': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Reserve username
+      batch.set(_firestore.collection('usernames').doc(username), {
+        'uid': user.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      // Sign out the user immediately after account creation
+      await _firebaseAuth.signOut();
+
+      // Return success message instead of the user
+      return 'Account created successfully! Please sign in to continue.';
+    } on FirebaseAuthException catch (e) {
+      // Re-throw Firebase auth exceptions
+      rethrow;
+    } catch (e) {
+      // Convert other exceptions to FirebaseAuthException for consistency
       throw FirebaseAuthException(
-        code: 'invalid-username',
-        message: 'Username must be 3-20 characters (letters, numbers, _)',
+        code: 'user-creation-failed',
+        message: 'Failed to create user: ${e.toString()}',
       );
     }
-
-    // Check username availability
-    final usernameDoc = await _firestore.collection('usernames').doc(username).get();
-    if (usernameDoc.exists) {
-      throw FirebaseAuthException(
-        code: 'username-exists',
-        message: 'Username already taken',
-      );
-    }
-
-    // Create the user
-    final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    final uid = userCredential.user?.uid;
-    if (uid == null) throw Exception('User creation failed');
-
-    // Batch write for atomic operations
-    final batch = _firestore.batch();
-
-    // Create user document
-    batch.set(_firestore.collection('users').doc(uid), {
-      'email': email,
-      'username': username,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // Reserve username
-    batch.set(_firestore.collection('usernames').doc(username), {
-      'uid': uid,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    // REMOVED THE SIGN OUT CALL - THIS WAS CAUSING THE ISSUE
   }
 
   Future<bool> isUsernameAvailable(String username) async {

@@ -44,7 +44,10 @@ class MyRecipesPage extends StatelessWidget {
                       // Action for my recipes
                     }
                   },
-                  child: Icon(Icons.add),
+                  child: IconTheme(
+                    data: IconThemeData(color: Colors.white),
+                    child: Icon(Icons.add),
+                  ),
                 );
               },
             );

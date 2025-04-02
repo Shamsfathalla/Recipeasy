@@ -34,6 +34,11 @@ class _MealPlansPageState extends State<MealPlansPage> {
   String _includeIngredients = '';
   String _excludeIngredients = '';
 
+  // Purple color constants
+  static const Color purplePrimary = Color(0xFF6A1B9A);
+  static const Color purpleLight = Color(0xFF9C4DFF);
+  static const Color purpleDark = Color(0xFF38006B);
+
   @override
   void initState() {
     super.initState();
@@ -82,15 +87,14 @@ class _MealPlansPageState extends State<MealPlansPage> {
     });
 
     try {
-      // Pass the user's meal preferences (protein, carbs, fat) and ingredients
       MealPlan mealPlan = await _spoonacularService.generateMealPlan(
         targetCalories: _targetCalories,
-        diet: _diet == 'None' ? '' : _diet, // Apply selected diet, if any
-        minProtein: _minProtein, // Protein goal
-        minCarbs: _minCarbs, // Carbs goal
-        minFat: _minFat, // Fat goal
-        includeIngredients: _includeIngredients, // Include these ingredients
-        excludeIngredients: _excludeIngredients, // Exclude these ingredients
+        diet: _diet == 'None' ? '' : _diet,
+        minProtein: _minProtein,
+        minCarbs: _minCarbs,
+        minFat: _minFat,
+        includeIngredients: _includeIngredients,
+        excludeIngredients: _excludeIngredients,
       );
 
       setState(() {
@@ -136,6 +140,10 @@ class _MealPlansPageState extends State<MealPlansPage> {
             const Text('No meal plan available'),
             const SizedBox(height: 16),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: purplePrimary,
+                foregroundColor: Colors.white,
+              ),
               onPressed: _fetchMealPlan,
               child: const Text('Generate Meal Plan'),
             ),
@@ -149,7 +157,7 @@ class _MealPlansPageState extends State<MealPlansPage> {
             'Your ${_timeFrame == 'day' ? 'Daily' : _timeFrame == 'week' ? 'Weekly' : 'Monthly'} Meal Plan',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
+              color: purplePrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -159,7 +167,9 @@ class _MealPlansPageState extends State<MealPlansPage> {
                 'Carbs: ${_mealPlan!.carbs.round()}g • '
                 'Fat: ${_mealPlan!.fat.round()}g',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isDarkMode ? colorScheme.onSurface.withOpacity(0.8) : Colors.grey[700],
+              color: isDarkMode
+                  ? colorScheme.onSurface.withOpacity(0.8)
+                  : Colors.grey[700],
             ),
           ),
           const SizedBox(height: 16),
@@ -167,8 +177,8 @@ class _MealPlansPageState extends State<MealPlansPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: colorScheme.primary,
-        child: const Icon(Icons.refresh),
+        backgroundColor: purplePrimary,
+        child: const Icon(Icons.refresh, color: Colors.white),
         onPressed: _fetchMealPlan,
       ),
     );
@@ -193,15 +203,15 @@ class _MealPlansPageState extends State<MealPlansPage> {
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return CircleAvatar(
-                  backgroundColor: colorScheme.primary,
-                  child: Icon(Icons.restaurant_menu, color: colorScheme.onPrimary),
+                  backgroundColor: purplePrimary,
+                  child: const Icon(Icons.restaurant_menu, color: Colors.white),
                 );
               },
             ),
           )
               : CircleAvatar(
-            backgroundColor: colorScheme.primary,
-            child: Icon(Icons.restaurant_menu, color: colorScheme.onPrimary),
+            backgroundColor: purplePrimary,
+            child: const Icon(Icons.restaurant_menu, color: Colors.white),
           ),
           title: Text(
             meal.title ?? "Unknown Meal",
@@ -213,17 +223,15 @@ class _MealPlansPageState extends State<MealPlansPage> {
           trailing: ElevatedButton(
             style: ElevatedButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-              backgroundColor: colorScheme.primary,
+              backgroundColor: purplePrimary,
+              foregroundColor: Colors.white,
             ),
             onPressed: () {
               if (meal.id != null) {
                 _navigateToRecipeDetails(meal.id!);
               }
             },
-            child: Text(
-              'View',
-              style: TextStyle(color: colorScheme.onPrimary),
-            ),
+            child: const Text('View'),
           ),
         ),
       );

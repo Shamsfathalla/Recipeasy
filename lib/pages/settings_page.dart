@@ -232,24 +232,20 @@ class SettingsPage extends StatelessWidget {
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match. Please try again.')),
+          const SnackBar(
+              content: Text('Passwords do not match. Please try again.')),
         );
       }
     }
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
-    final confirm = await showDialog(
+    // Step 1: Confirmation dialog
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'Delete Account',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        content: Text(
-          'Are you sure you want to delete your account? This action cannot be undone.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
+        title: const Text('Delete Account'),
+        content: const Text('This will permanently delete your account and all data.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -263,78 +259,119 @@ class SettingsPage extends StatelessWidget {
       ),
     );
 
-    if (confirm == true) {
-      try {
-        // Ask for password to reauthenticate
-        final password = await _showInputDialog(
-          context,
-          'Reauthenticate',
-          'Enter your password',
-          isPassword: true,
-        );
-        if (password == null || password.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Password is required for security.')),
-          );
-          return;
-        }
+    if (confirm != true) return;
 
-        // Reauthenticate user before deleting
-        final credential = EmailAuthProvider.credential(
-            email: user!.email!, password: password);
-        await user!.reauthenticateWithCredential(credential);
+    try {
+      // Step 2: Reauthenticate
+      final password = await _showInputDialog(
+        context,
+        'Confirm Deletion',
+        'Enter your password to confirm',
+        isPassword: true,
+      );
+      if (password == null) return;
 
-        // First delete the username reference
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user!.uid)
-            .get();
+      final credential = EmailAuthProvider.credential(
+        email: user!.email!,
+        password: password,
+      );
+      await user!.reauthenticateWithCredential(credential);
 
-        if (userDoc.exists) {
-          final username = userDoc.data()?['username'];
-          if (username != null && username.isNotEmpty) {
-            await FirebaseFirestore.instance
-                .collection('usernames')
-                .doc(username)
-                .delete();
-          }
+      // Step 3: Show loading
+      final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Deleting account...'),
+            ],
+          ),
+          duration: Duration(minutes: 5), // Prevents auto-hide
+        ),
+      );
 
-          // Then delete the user document
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user!.uid)
-              .delete();
-        }
+      // Step 4: Fetch all data
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
 
-        // Finally delete the Firebase Auth user
-        await user!.delete();
+      if (!userDoc.exists) throw Exception('User document not found');
+      final username = userDoc.data()?['username'];
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account deleted successfully!')),
-        );
+      // Fetch all subcollections in parallel
+      final [postsSnapshot, followersSnapshot, followingSnapshot] = await Future.wait([
+        FirebaseFirestore.instance.collection('users/${user!.uid}/posts').get(),
+        FirebaseFirestore.instance.collection('users/${user!.uid}/followers').get(),
+        FirebaseFirestore.instance.collection('users/${user!.uid}/following').get(),
+      ]);
 
-        // Navigate back to login
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => LoginPage()),
-              (route) => false,
-        );
-      } on FirebaseAuthException catch (e) {
-        String errorMessage = 'Error deleting account: ${e.message}';
-        if (e.code == 'requires-recent-login') {
-          errorMessage = 'You need to log in again before deleting your account.';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+      // Step 5: Batch delete everything
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Delete all posts
+      for (final doc in postsSnapshot.docs) {
+        batch.delete(doc.reference);
       }
+
+      // Delete all followers
+      for (final doc in followersSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Delete all following
+      for (final doc in followingSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Delete username reference (if exists)
+      if (username != null && username.isNotEmpty) {
+        batch.delete(FirebaseFirestore.instance.collection('usernames').doc(username));
+      }
+
+      // Finally, delete the user document
+      batch.delete(FirebaseFirestore.instance.collection('users').doc(user!.uid));
+
+      // Commit the batch (atomic operation)
+      await batch.commit();
+
+      // Step 6: Delete Firebase Auth account
+      await user!.delete();
+
+      // Step 7: Navigate to login
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => LoginPage()),
+            (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account deleted successfully')),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      String message = 'Deletion failed: ${e.message}';
+      if (e.code == 'requires-recent-login') {
+        message = 'Please sign in again before deleting';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } on FirebaseException catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Database error: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
   Future<void> _changeUsername(BuildContext context) async {
+    if (user == null) return;
+
     // Get current username
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
@@ -351,8 +388,14 @@ class SettingsPage extends StatelessWidget {
     if (result == null || !result['valid']) return;
 
     final newUsername = result['username'] as String;
+    final password = result['password'] as String;
 
     try {
+      // Reauthenticate user before making changes
+      final credential = EmailAuthProvider.credential(
+          email: user!.email!, password: password);
+      await user!.reauthenticateWithCredential(credential);
+
       // Show loading indicator
       final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -372,28 +415,23 @@ class SettingsPage extends StatelessWidget {
 
       // Delete old username reference if it exists
       if (currentUsername.isNotEmpty) {
-        batch.delete(
-            FirebaseFirestore.instance
-                .collection('usernames')
-                .doc(currentUsername)
-        );
+        batch.delete(FirebaseFirestore.instance
+            .collection('usernames')
+            .doc(currentUsername));
       }
 
       // Add new username reference
       batch.set(
-          FirebaseFirestore.instance
-              .collection('usernames')
-              .doc(newUsername),
-          {'uid': user!.uid, 'updatedAt': FieldValue.serverTimestamp()}
-      );
+          FirebaseFirestore.instance.collection('usernames').doc(newUsername),
+          {'uid': user!.uid, 'updatedAt': FieldValue.serverTimestamp()});
 
       // Update user document with new username
       batch.update(
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(user!.uid),
-          {'username': newUsername, 'updatedAt': FieldValue.serverTimestamp()}
-      );
+          FirebaseFirestore.instance.collection('users').doc(user!.uid),
+          {
+            'username': newUsername,
+            'updatedAt': FieldValue.serverTimestamp()
+          });
 
       // Commit all operations
       await batch.commit();
@@ -402,6 +440,11 @@ class SettingsPage extends StatelessWidget {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Username updated successfully!')),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Authentication failed: ${e.message}')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -414,7 +457,8 @@ class SettingsPage extends StatelessWidget {
   Future<void> _openMealPlanPreferences(BuildContext context) async {
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You must be logged in to set preferences')),
+        const SnackBar(
+            content: Text('You must be logged in to set preferences')),
       );
       return;
     }
@@ -444,7 +488,9 @@ class SettingsPage extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (context) => MealDetailsPage(
-            initialPreferences: prefs.isNotEmpty ? prefs : {
+            initialPreferences: prefs.isNotEmpty
+                ? prefs
+                : {
               'timeFrame': 'day',
               'diet': 'None',
               'targetCalories': 2000,
@@ -506,7 +552,8 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  Future<Map<String, String>?> _showPasswordChangeDialog(BuildContext context) async {
+  Future<Map<String, String>?> _showPasswordChangeDialog(
+      BuildContext context) async {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
@@ -561,7 +608,9 @@ class SettingsPage extends StatelessWidget {
               final oldPassword = oldPasswordController.text.trim();
               final newPassword = newPasswordController.text.trim();
               final confirmPassword = confirmPasswordController.text.trim();
-              if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
+              if (oldPassword.isEmpty ||
+                  newPassword.isEmpty ||
+                  confirmPassword.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please fill in all fields.')),
                 );
@@ -650,6 +699,7 @@ class UsernameChangeDialog extends StatefulWidget {
 
 class _UsernameChangeDialogState extends State<UsernameChangeDialog> {
   final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isChecking = false;
   bool _isAvailable = false;
   bool _isValid = false;
@@ -659,12 +709,18 @@ class _UsernameChangeDialogState extends State<UsernameChangeDialog> {
   void initState() {
     super.initState();
     _usernameController.addListener(_checkUsername);
+    _passwordController.addListener(_updateButtonState);
   }
 
   @override
   void dispose() {
     _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  void _updateButtonState() {
+    setState(() {});
   }
 
   Future<void> _checkUsername() async {
@@ -720,69 +776,85 @@ class _UsernameChangeDialogState extends State<UsernameChangeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isFormValid = _isAvailable &&
+        _passwordController.text.isNotEmpty &&
+        !_isSameAsCurrent;
+
     return AlertDialog(
       title: const Text('Change Username'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Current username: ${widget.currentUsername}'),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _usernameController,
-            decoration: InputDecoration(
-              labelText: 'New Username',
-              hintText: 'Enter new username',
-              border: const OutlineInputBorder(),
-              suffixIcon: _isChecking
-                  ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-                  : null,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Current username: ${widget.currentUsername}'),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _usernameController,
+              decoration: InputDecoration(
+                labelText: 'New Username',
+                hintText: 'Enter new username',
+                border: const OutlineInputBorder(),
+                suffixIcon: _isChecking
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : null,
+              ),
+              autofocus: true,
             ),
-            autofocus: true,
-          ),
-          const SizedBox(height: 10),
-          if (_usernameController.text.isNotEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_isSameAsCurrent)
-                  Text(
-                    'Please enter a different username',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  )
-                else if (!_isValid)
-                  Text(
-                    'Must be 3-20 characters (letters, numbers, _)',
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                    ),
-                  )
-                else if (_isAvailable)
+            const SizedBox(height: 10),
+            if (_usernameController.text.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isSameAsCurrent)
                     Text(
-                      'Username available',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                      ),
-                    )
-                  else
-                    Text(
-                      'Username taken',
+                      'Please enter a different username',
                       style: TextStyle(
                         color: Colors.red,
                         fontSize: 12,
                       ),
-                    ),
-              ],
+                    )
+                  else if (!_isValid)
+                    Text(
+                      'Must be 3-20 characters (letters, numbers, _)',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                      ),
+                    )
+                  else if (_isAvailable)
+                      Text(
+                        'Username available',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 12,
+                        ),
+                      )
+                    else
+                      Text(
+                        'Username taken',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                        ),
+                      ),
+                ],
+              ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                hintText: 'Enter your password to confirm',
+                border: OutlineInputBorder(),
+              ),
             ),
-        ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -790,9 +862,10 @@ class _UsernameChangeDialogState extends State<UsernameChangeDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _isAvailable
+          onPressed: isFormValid
               ? () => Navigator.pop(context, {
             'username': _usernameController.text.trim(),
+            'password': _passwordController.text.trim(),
             'valid': true
           })
               : null,

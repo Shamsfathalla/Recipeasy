@@ -5,13 +5,32 @@ class FirestoreServices {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Search users by username prefix
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      if (query.isEmpty) return [];
+
+      final snapshot = await _firestore
+          .collection('users')
+          .where('username', isGreaterThanOrEqualTo: query.toLowerCase())
+          .where('username', isLessThanOrEqualTo: query.toLowerCase() + '\uf8ff')
+          .limit(10)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => doc.data()..['id'] = doc.id)
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to search users: $e');
+    }
+  }
+
   // Save meal preferences to Firestore
   Future<void> saveMealPreferences({
     required String userId,
     required Map<String, dynamic> preferences,
   }) async {
     try {
-      // Save to the user's preferences subcollection
       await _firestore
           .collection('users')
           .doc(userId)
@@ -19,7 +38,6 @@ class FirestoreServices {
           .doc('meal')
           .set(preferences, SetOptions(merge: true));
 
-      // Also store a copy in the username_checks collection for quick access
       final username = await getUsername(userId);
       if (username != null) {
         await _firestore
@@ -81,13 +99,11 @@ class FirestoreServices {
     required String newUsername,
   }) async {
     try {
-      // Check if username is available
       final available = await isUsernameAvailable(newUsername);
       if (!available) {
         throw Exception('Username is already taken');
       }
 
-      // Get current username if exists
       final currentUsername = await getUsername(userId);
 
       // Update user document
@@ -95,7 +111,7 @@ class FirestoreServices {
         'username': newUsername.toLowerCase(),
       });
 
-      // Add to username_checks collection
+      // Update username_checks
       await _firestore
           .collection('username_checks')
           .doc(newUsername.toLowerCase())
@@ -105,7 +121,7 @@ class FirestoreServices {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Remove old username from username_checks if it existed
+      // Remove old username if it existed
       if (currentUsername != null) {
         await _firestore
             .collection('username_checks')
@@ -134,7 +150,7 @@ class FirestoreServices {
       if (query.docs.isNotEmpty) {
         final userId = query.docs.first.data()['userId'] as String;
         final userDoc = await _firestore.collection('users').doc(userId).get();
-        return userDoc.data();
+        return userDoc.data()?..['id'] = userId;
       }
       return null;
     } catch (e) {

@@ -201,6 +201,17 @@ class SettingsPage extends StatelessWidget {
       final oldPassword = result['oldPassword'];
       final newPassword = result['newPassword'];
       final confirmPassword = result['confirmPassword'];
+
+      // Check if new password is same as old password
+      if (newPassword == oldPassword) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('New password cannot be the same as current password'),
+          ),
+        );
+        return;
+      }
+
       if (newPassword != null &&
           confirmPassword != null &&
           newPassword == confirmPassword) {

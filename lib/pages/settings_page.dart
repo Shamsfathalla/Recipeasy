@@ -251,7 +251,10 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
-    // Step 1: Confirmation dialog
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Step 1: Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -283,72 +286,70 @@ class SettingsPage extends StatelessWidget {
       if (password == null) return;
 
       final credential = EmailAuthProvider.credential(
-        email: user!.email!,
+        email: user.email!,
         password: password,
       );
-      await user!.reauthenticateWithCredential(credential);
+      await user.reauthenticateWithCredential(credential);
 
-      // Step 3: Show loading
-      final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Deleting account...'),
-            ],
-          ),
-          duration: Duration(minutes: 5), // Prevents auto-hide
-        ),
+      // Step 3: Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Deleting account...')),
       );
 
-      // Step 4: Fetch all data
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .get();
+      final db = FirebaseFirestore.instance;
+      final userRef = db.collection('users').doc(user.uid);
 
-      if (!userDoc.exists) throw Exception('User document not found');
-      final username = userDoc.data()?['username'];
+      // Step 4: Get all followers and following
+      final followersSnapshot = await db.collection('users/${user.uid}/followers').get();
+      final followingSnapshot = await db.collection('users/${user.uid}/following').get();
 
-      // Fetch all subcollections in parallel
-      final [postsSnapshot, followersSnapshot, followingSnapshot] = await Future.wait([
-        FirebaseFirestore.instance.collection('users/${user!.uid}/posts').get(),
-        FirebaseFirestore.instance.collection('users/${user!.uid}/followers').get(),
-        FirebaseFirestore.instance.collection('users/${user!.uid}/following').get(),
-      ]);
+      WriteBatch batch = db.batch();
 
-      // Step 5: Batch delete everything
-      final batch = FirebaseFirestore.instance.batch();
-
-      // Delete all posts
-      for (final doc in postsSnapshot.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // Delete all followers
+      // 🔹 Remove the user from all their followers' following lists & decrement their count
       for (final doc in followersSnapshot.docs) {
-        batch.delete(doc.reference);
+        final followerId = doc.id;
+        final followingRef = db.collection('users').doc(followerId).collection('following').doc(user.uid);
+        final followerUserRef = db.collection('users').doc(followerId);
+
+        batch.delete(followingRef); // Remove from follower's following list
+        batch.delete(doc.reference); // Remove from user's followers list
+
+        // Decrement follower's following count
+        batch.update(followerUserRef, {
+          'followingCount': FieldValue.increment(-1),
+        });
       }
 
-      // Delete all following
+      // 🔹 Remove the user from all their following users' followers lists & decrement their count
       for (final doc in followingSnapshot.docs) {
-        batch.delete(doc.reference);
+        final followingId = doc.id;
+        final followerRef = db.collection('users').doc(followingId).collection('followers').doc(user.uid);
+        final followingUserRef = db.collection('users').doc(followingId);
+
+        batch.delete(followerRef); // Remove from following user's followers list
+        batch.delete(doc.reference); // Remove from user's following list
+
+        // Decrement following user's followers count
+        batch.update(followingUserRef, {
+          'followersCount': FieldValue.increment(-1),
+        });
       }
 
-      // Delete username reference (if exists)
+      // 🔹 Delete username reference if exists
+      final userDoc = await userRef.get();
+      final username = userDoc.data()?['username'];
       if (username != null && username.isNotEmpty) {
-        batch.delete(FirebaseFirestore.instance.collection('usernames').doc(username));
+        batch.delete(db.collection('usernames').doc(username));
       }
 
-      // Finally, delete the user document
-      batch.delete(FirebaseFirestore.instance.collection('users').doc(user!.uid));
+      // 🔹 Finally, delete the user document
+      batch.delete(userRef);
 
-      // Commit the batch (atomic operation)
+      // Step 5: Commit batch operation
       await batch.commit();
 
       // Step 6: Delete Firebase Auth account
-      await user!.delete();
+      await user.delete();
 
       // Step 7: Navigate to login
       ScaffoldMessenger.of(context).hideCurrentSnackBar();

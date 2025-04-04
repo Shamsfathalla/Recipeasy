@@ -8,8 +8,8 @@ import '/pages/my_recipes_page.dart';
 import '/pages/settings_page.dart';
 import '/pages/meal_plans_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/Spoonacular_API';
-import 'dart:math';
+import '../services/spoonacular_api';
+import '../services/recipe_folder_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,11 +37,21 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _isLoading = true;
     });
-    final recipes = await _spoonacularService.getRandomRecipes();
-    setState(() {
-      _exploreRecipes = recipes;
-      _isLoading = false;
-    });
+    try {
+      final recipes = await _spoonacularService.getRandomRecipes();
+      if (recipes.isEmpty) {
+        print('No recipes found from the API');
+      }
+      setState(() {
+        _exploreRecipes = recipes;
+      });
+    } catch (e) {
+      print('Error fetching random recipes: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _onItemTapped(int index) {
@@ -50,7 +60,9 @@ class _HomePageState extends State<HomePage> {
       _searchController.clear();
       _recipes = [];
       _isSearching = false;
-      _fetchRandomRecipes();
+      if (index == 0) {
+        _fetchRandomRecipes();
+      }
     });
   }
 
@@ -107,7 +119,7 @@ class _HomePageState extends State<HomePage> {
       ),
       MyRecipesPage(),
       ShopListPage(),
-      MealPlansPage(userId: FirebaseAuth.instance.currentUser?.uid ?? ''), // Added Meal Plans page
+      MealPlansPage(userId: FirebaseAuth.instance.currentUser?.uid ?? ''),
     ];
 
     return Scaffold(
@@ -169,7 +181,7 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(
               icon: Icon(Icons.shopping_cart), label: 'Shop List'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu), label: 'Meal Plans'), // Added Meal Plans
+              icon: Icon(Icons.restaurant_menu), label: 'Meal Plans'),
         ],
       ),
     );

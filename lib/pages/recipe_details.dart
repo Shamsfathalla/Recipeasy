@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import '../services/Spoonacular_APi';
+import '../services/Spoonacular_API ';
+import '../services/recipe_folder_service.dart';
 
 class RecipeDetailsPage extends StatefulWidget {
   final int recipeId;
+  final VoidCallback? onFolderUpdated;
 
-  const RecipeDetailsPage({super.key, required this.recipeId});
+  const RecipeDetailsPage({
+    super.key,
+    required this.recipeId,
+    this.onFolderUpdated,
+  });
 
   @override
   _RecipeDetailsPageState createState() => _RecipeDetailsPageState();
@@ -12,16 +18,31 @@ class RecipeDetailsPage extends StatefulWidget {
 
 class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
   final SpoonacularService _spoonacularService = SpoonacularService();
+  final RecipeFolderService _folderService = RecipeFolderService();
   Map<String, dynamic>? _recipeDetails;
   bool _isLoading = true;
   bool _hasError = false;
+  int _currentSectionIndex = 0;
+  List<Map<String, dynamic>> _folders = [];
+  Map<String, bool> _isRecipeInFolder = {};
   bool _isBookmarked = false;
-  int _currentSectionIndex = 0; // 0: About, 1: Ingredients, 2: Instructions, 3: Nutrition
+  bool _isGeneralSelected = true;
+  final TextEditingController _newFolderController = TextEditingController();
+  String? _errorMessage;
+
+  bool get _areOtherFoldersSelected => _isRecipeInFolder.values.any((value) => value);
 
   @override
   void initState() {
     super.initState();
     _fetchRecipeDetails();
+    _loadFolders();
+  }
+
+  @override
+  void dispose() {
+    _newFolderController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchRecipeDetails() async {
@@ -44,25 +65,200 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     }
   }
 
-  void _toggleBookmark() {
+  Future<void> _loadFolders() async {
+    final folders = await _folderService.getUserFolders();
     setState(() {
-      _isBookmarked = !_isBookmarked;
+      _folders = folders.where((folder) => folder['id'] != 'general').toList();
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isBookmarked ? 'Recipe bookmarked!' : 'Bookmark removed'),
-        duration: const Duration(seconds: 1),
-      ),
+
+    // Check General folder
+    _isGeneralSelected = await _checkIfRecipeInFolder('general');
+
+    // Check other folders
+    bool isInAnyOtherFolder = false;
+    for (final folder in _folders) {
+      final isInFolder = await _checkIfRecipeInFolder(folder['id']);
+      setState(() {
+        _isRecipeInFolder[folder['id']] = isInFolder;
+      });
+      if (isInFolder) {
+        isInAnyOtherFolder = true;
+      }
+    }
+
+    setState(() {
+      _isBookmarked = _isGeneralSelected || isInAnyOtherFolder;
+    });
+  }
+
+  Future<bool> _checkIfRecipeInFolder(String folderId) async {
+    final recipes = await _folderService.getRecipesInFolder(folderId);
+    return recipes.any((recipe) => recipe['recipeId'] == widget.recipeId);
+  }
+
+  void _showFolderDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Save Recipe'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newFolderController,
+                              decoration: const InputDecoration(
+                                labelText: 'New folder name',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: () async {
+                              final folderName = _newFolderController.text.trim();
+                              if (folderName.isNotEmpty) {
+                                if (_folders.any((folder) => folder['name'] == folderName)) {
+                                  setState(() {
+                                    _errorMessage = 'Folder with this name already exists.';
+                                  });
+                                  return;
+                                }
+                                setState(() {
+                                  _errorMessage = null;
+                                });
+                                await _folderService.createFolder(folderName);
+                                _newFolderController.clear();
+                                await _loadFolders();
+                                if (mounted) {
+                                  setState(() {});
+                                }
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    CheckboxListTile(
+                      title: const Text('General'),
+                      value: _isGeneralSelected || _areOtherFoldersSelected,
+                      onChanged: (value) {
+                        if (_areOtherFoldersSelected && value == false) {
+                          // Don't allow unselecting General if other folders are selected
+                          return;
+                        }
+                        setState(() {
+                          _isGeneralSelected = value ?? false;
+                        });
+                      },
+                      activeColor: const Color.fromRGBO(110, 59, 226, 1),
+                    ),
+                    if (_folders.isEmpty)
+                      const Text('No folders available')
+                    else
+                      ..._folders.map((folder) {
+                        return CheckboxListTile(
+                          title: Text(folder['name']),
+                          value: _isRecipeInFolder[folder['id']] ?? false,
+                          onChanged: (value) {
+                            setState(() {
+                              _isRecipeInFolder[folder['id']] = value!;
+                            });
+                          },
+                          activeColor: const Color.fromRGBO(110, 59, 226, 1),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _updateFolders();
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  void _showShareUI() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality would appear here'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+  Future<void> _updateFolders() async {
+    final isCurrentlyInGeneral = await _checkIfRecipeInFolder('general');
+
+    // Handle General folder
+    if (_isGeneralSelected && !isCurrentlyInGeneral) {
+      await _folderService.addRecipeToFolder(
+        folderId: 'general',
+        recipeId: widget.recipeId,
+      );
+    } else if (!_isGeneralSelected && isCurrentlyInGeneral) {
+      final recipes = await _folderService.getRecipesInFolder('general');
+      final recipeDoc = recipes.firstWhere(
+            (recipe) => recipe['recipeId'] == widget.recipeId,
+      );
+      await _folderService.removeRecipeFromFolder(
+        folderId: 'general',
+        recipeDocId: recipeDoc['id'],
+      );
+    }
+
+    // Handle other folders
+    for (final folder in _folders) {
+      final folderId = folder['id'];
+      final shouldBeInFolder = _isRecipeInFolder[folderId] ?? false;
+      final isCurrentlyInFolder = await _checkIfRecipeInFolder(folderId);
+
+      if (shouldBeInFolder && !isCurrentlyInFolder) {
+        await _folderService.addRecipeToFolder(
+          folderId: folderId,
+          recipeId: widget.recipeId,
+        );
+      } else if (!shouldBeInFolder && isCurrentlyInFolder) {
+        final recipes = await _folderService.getRecipesInFolder(folderId);
+        final recipeDoc = recipes.firstWhere(
+              (recipe) => recipe['recipeId'] == widget.recipeId,
+        );
+        await _folderService.removeRecipeFromFolder(
+          folderId: folderId,
+          recipeDocId: recipeDoc['id'],
+        );
+      }
+    }
+
+    // Update bookmark status
+    setState(() {
+      _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((value) => value);
+    });
+
+    if (widget.onFolderUpdated != null) {
+      widget.onFolderUpdated!();
+    }
   }
 
   Widget _buildImageSection() {
@@ -192,13 +388,9 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
   }
 
   Widget _buildInstructionsSection() {
-    // Clean up instructions by splitting into steps
     String rawInstructions = _recipeDetails!['instructions'] ?? '';
     String cleanedInstructions = rawInstructions.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Split instructions into steps (assuming they're numbered or separated by newlines)
     List<String> instructionSteps = cleanedInstructions.split('\n').where((step) => step.trim().isNotEmpty).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -255,10 +447,8 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         ],
       );
     }
-
     final nutrition = _recipeDetails!['nutrition'];
     final nutrients = nutrition['nutrients'] as List<dynamic>?;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -301,7 +491,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
 
   Widget _buildCurrentSection() {
     if (_recipeDetails == null) return const SizedBox();
-
     switch (_currentSectionIndex) {
       case 0:
         return _buildAboutSection();
@@ -314,6 +503,24 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
       default:
         return _buildAboutSection();
     }
+  }
+
+  Widget _buildNavButton(String text, int index) {
+    final isSelected = _currentSectionIndex == index;
+    return TextButton(
+      onPressed: () {
+        setState(() {
+          _currentSectionIndex = index;
+        });
+      },
+      style: TextButton.styleFrom(
+        foregroundColor: isSelected ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+        textStyle: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      child: Text(text),
+    );
   }
 
   @override
@@ -351,11 +558,10 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (_recipeDetails!['image'] != null) _buildImageSection(),
-
-            // Title and Action Buttons
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
                     child: Text(
@@ -369,23 +575,17 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.share),
-                    onPressed: _showShareUI,
-                    tooltip: 'Share recipe',
-                  ),
-                  IconButton(
                     icon: Icon(
                       _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey[600],
+                      color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+                      size: 30,
                     ),
-                    onPressed: _toggleBookmark,
+                    onPressed: _showFolderDialog,
                     tooltip: 'Bookmark recipe',
                   ),
                 ],
               ),
             ),
-
-            // Navigation Bar
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(
@@ -398,30 +598,10 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                 ],
               ),
             ),
-
-            // Current Section Content
             _buildCurrentSection(),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildNavButton(String text, int index) {
-    final isSelected = _currentSectionIndex == index;
-    return TextButton(
-      onPressed: () {
-        setState(() {
-          _currentSectionIndex = index;
-        });
-      },
-      style: TextButton.styleFrom(
-        foregroundColor: isSelected ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
-        textStyle: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      child: Text(text),
     );
   }
 }

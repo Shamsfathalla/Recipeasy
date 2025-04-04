@@ -80,8 +80,7 @@ class SettingsPage extends StatelessWidget {
     _buildSettingsOption(
         context, Icons.notifications, 'Notification Settings', () {}),
     _buildThemeToggleOption(context),
-    _buildSettingsOption(context, Icons.shopping_basket,
-        'Shopping List Preferences', () {}),
+    // Removed Shopping List Preferences option
   ]);
 
   Widget _buildSupportSection(BuildContext context) => _buildCard([

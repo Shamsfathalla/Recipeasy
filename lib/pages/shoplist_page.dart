@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() {
   runApp(MyApp());
@@ -8,7 +10,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Color.fromRGBO(110, 59, 226, 1);
-
     return MaterialApp(
       theme: ThemeData(
         primaryColor: primaryColor,
@@ -105,13 +106,98 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
       floatingActionButton: _showFab
           ? FloatingActionButton(
         onPressed: () {
-          // Add item functionality
+          _showAddIngredientDialog();
         },
         child: Icon(Icons.add, color: Colors.white),
         backgroundColor: primaryColor,
       )
           : null,
     );
+  }
+
+  void _showAddIngredientDialog() {
+    final TextEditingController _ingredientController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Add Ingredient'),
+          content: TextField(
+            controller: _ingredientController,
+            decoration: InputDecoration(labelText: 'Ingredient Name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final ingredient = _ingredientController.text.trim();
+                if (ingredient.isNotEmpty) {
+                  await _addIngredientToShoppingList(ingredient, manual: true);
+                  Navigator.pop(context);
+                }
+              },
+              child: Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _addIngredientToShoppingList(String ingredient, {required bool manual}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final collectionRef = FirebaseFirestore.instance.collection('users/${user.uid}/shopping_list');
+      final querySnapshot = await collectionRef.where('name', isEqualTo: ingredient).get();
+      if (querySnapshot.docs.isNotEmpty) {
+        if (manual) {
+          // Show error message if the ingredient already exists and it's a manual addition
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Ingredient "$ingredient" already exists in your shopping list.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Increment the quantity if the ingredient already exists and it's not a manual addition
+          final doc = querySnapshot.docs.first;
+          await collectionRef.doc(doc.id).update({
+            'quantity': FieldValue.increment(1),
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Incremented "$ingredient" quantity in your shopping list.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Add a new document if the ingredient does not exist
+        await collectionRef.add({
+          'name': ingredient,
+          'quantity': 1,
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added "$ingredient" to shopping list'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding ingredient to shopping list: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to add "$ingredient" to shopping list'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
 
@@ -121,57 +207,113 @@ class CurrentShopList extends StatefulWidget {
 }
 
 class _CurrentShopListState extends State<CurrentShopList> {
-  final List<Map<String, dynamic>> shopItems = [
-    {'name': 'Flour', 'checked': false},
-    {'name': 'Sugar', 'checked': false},
-    {'name': 'Eggs', 'checked': false},
-    {'name': 'Milk', 'checked': false},
-    {'name': 'Butter', 'checked': false},
-    {'name': 'Salt', 'checked': false},
-    {'name': 'Pepper', 'checked': false},
-    {'name': 'Olive Oil', 'checked': false},
-    {'name': 'Tomatoes', 'checked': false},
-    {'name': 'Onions', 'checked': false},
-  ];
+  Stream<QuerySnapshot> _shoppingListStream = FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').snapshots();
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.all(10.0),
-      itemCount: shopItems.length,
-      itemBuilder: (context, index) {
-        return Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          elevation: 3.0,
-          margin: EdgeInsets.symmetric(vertical: 6.0),
-          child: ListTile(
-            leading: Checkbox(
-              value: shopItems[index]['checked'],
-              onChanged: (bool? value) {
-                setState(() {
-                  shopItems[index]['checked'] = value!;
-                });
-              },
-            ),
-            title: Text(
-              shopItems[index]['name'],
-              style: TextStyle(
-                decoration: shopItems[index]['checked']
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
+    return StreamBuilder<QuerySnapshot>(
+      stream: _shoppingListStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
+        if (documents.isEmpty) {
+          return Center(
+            child: Text('Your shopping list is empty.'),
+          );
+        }
+        return ListView.builder(
+          padding: EdgeInsets.all(10.0),
+          itemCount: documents.length,
+          itemBuilder: (context, index) {
+            final doc = documents[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final name = data['name'];
+            final quantity = data['quantity'] ?? 1;
+            return Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0),
               ),
-            ),
-            trailing: IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                setState(() {
-                  shopItems.removeAt(index);
-                });
-              },
-            ),
-          ),
+              elevation: 3.0,
+              margin: EdgeInsets.symmetric(vertical: 6.0),
+              child: ListTile(
+                title: Text(name),
+                subtitle: Text('Quantity: $quantity'),
+                leading: Checkbox(
+                  value: data['bought'] ?? false,
+                  onChanged: (bool? value) async {
+                    await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
+                      'bought': value,
+                    });
+                    if (value == true) {
+                      await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').add({
+                        'name': name,
+                        'quantity': quantity,
+                        'addedAt': FieldValue.serverTimestamp(),
+                      });
+                      await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).delete();
+                    }
+                    setState(() {}); // Refresh the list
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(value! ? 'Marked "$name" as bought' : 'Unmarked "$name" as bought'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.remove),
+                      onPressed: () async {
+                        if (quantity > 1) {
+                          await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
+                            'quantity': FieldValue.increment(-1),
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Decremented "$name" quantity in your shopping list.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).delete();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Removed "$name" from your shopping list.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                        setState(() {}); // Refresh the list
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.add),
+                      onPressed: () async {
+                        await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
+                          'quantity': FieldValue.increment(1),
+                        });
+                        setState(() {}); // Refresh the list
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Incremented "$name" quantity in your shopping list.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -179,43 +321,100 @@ class _CurrentShopListState extends State<CurrentShopList> {
 }
 
 class HistoryShopList extends StatelessWidget {
-  final List<String> historyItems = [
-    'Flour', 'Sugar', 'Eggs', 'Milk', 'Butter',
-    'Salt', 'Pepper', 'Olive Oil', 'Tomatoes', 'Onions'
-  ];
+  final Stream<QuerySnapshot> _historyStream;
+  HistoryShopList()
+      : _historyStream = FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').snapshots();
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Color.fromRGBO(110, 59, 226, 1);
-
-    return ListView.builder(
-      padding: EdgeInsets.all(10.0),
-      itemCount: historyItems.length,
-      itemBuilder: (context, index) {
-        return Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          elevation: 3.0,
-          margin: EdgeInsets.symmetric(vertical: 6.0),
-          child: ListTile(
-            leading: Icon(
-              Icons.history,
-              color: Theme.of(context).iconTheme.color,
-            ),
-            title: Text(historyItems[index]),
-            trailing: IconButton(
-              icon: Icon(Icons.add, color: primaryColor),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Added ${historyItems[index]} to current list'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
-          ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: _historyStream,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
+        if (documents.isEmpty) {
+          return Center(
+            child: Text('Your history is empty.'),
+          );
+        }
+        return ListView.builder(
+          padding: EdgeInsets.all(10.0),
+          itemCount: documents.length,
+          itemBuilder: (context, index) {
+            final doc = documents[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final name = data['name'];
+            final quantity = data['quantity'] ?? 1;
+            return Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              elevation: 3.0,
+              margin: EdgeInsets.symmetric(vertical: 6.0),
+              child: ListTile(
+                title: Text(name),
+                subtitle: Text('Quantity: $quantity'),
+                leading: Icon(Icons.history, color: Theme.of(context).iconTheme.color),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.add),
+                      onPressed: () async {
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user == null) return;
+                        final collectionRef = FirebaseFirestore.instance.collection('users/${user.uid}/shopping_list');
+                        final querySnapshot = await collectionRef.where('name', isEqualTo: name).get();
+                        if (querySnapshot.docs.isNotEmpty) {
+                          // Increment the quantity if the ingredient already exists
+                          final doc = querySnapshot.docs.first;
+                          await collectionRef.doc(doc.id).update({
+                            'quantity': FieldValue.increment(1),
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Incremented "$name" quantity in your shopping list.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        } else {
+                          // Add a new document if the ingredient does not exist
+                          await collectionRef.add({
+                            'name': name,
+                            'quantity': quantity,
+                            'addedAt': FieldValue.serverTimestamp(),
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Added "$name" to shopping list'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () async {
+                        await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').doc(doc.id).delete();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Removed "$name" from your history.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );

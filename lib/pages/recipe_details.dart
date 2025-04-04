@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import '../services/Spoonacular_API ';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/spoonacular_api';
 import '../services/recipe_folder_service.dart';
 
 class RecipeDetailsPage extends StatefulWidget {
   final int recipeId;
   final VoidCallback? onFolderUpdated;
-
   const RecipeDetailsPage({
     super.key,
     required this.recipeId,
@@ -70,10 +71,8 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     setState(() {
       _folders = folders.where((folder) => folder['id'] != 'general').toList();
     });
-
     // Check General folder
     _isGeneralSelected = await _checkIfRecipeInFolder('general');
-
     // Check other folders
     bool isInAnyOtherFolder = false;
     for (final folder in _folders) {
@@ -85,7 +84,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         isInAnyOtherFolder = true;
       }
     }
-
     setState(() {
       _isBookmarked = _isGeneralSelected || isInAnyOtherFolder;
     });
@@ -210,7 +208,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
 
   Future<void> _updateFolders() async {
     final isCurrentlyInGeneral = await _checkIfRecipeInFolder('general');
-
     // Handle General folder
     if (_isGeneralSelected && !isCurrentlyInGeneral) {
       await _folderService.addRecipeToFolder(
@@ -227,13 +224,11 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         recipeDocId: recipeDoc['id'],
       );
     }
-
     // Handle other folders
     for (final folder in _folders) {
       final folderId = folder['id'];
       final shouldBeInFolder = _isRecipeInFolder[folderId] ?? false;
       final isCurrentlyInFolder = await _checkIfRecipeInFolder(folderId);
-
       if (shouldBeInFolder && !isCurrentlyInFolder) {
         await _folderService.addRecipeToFolder(
           folderId: folderId,
@@ -250,11 +245,24 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         );
       }
     }
-
     // Update bookmark status
     setState(() {
       _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((value) => value);
     });
+
+    // Show success message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isBookmarked
+                ? 'Recipe saved to your folders!'
+                : 'Recipe removed from your folders',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
 
     if (widget.onFolderUpdated != null) {
       widget.onFolderUpdated!();
@@ -344,9 +352,74 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               style: const TextStyle(fontSize: 16),
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () {
+              _addIngredientToShoppingList(ingredient);
+            },
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _addIngredientToShoppingList(String ingredient) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in to add ingredients to your shopping list.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      final collectionRef = FirebaseFirestore.instance.collection('users/${user.uid}/shopping_list');
+      final querySnapshot = await collectionRef.where('name', isEqualTo: ingredient).get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        final doc = querySnapshot.docs.first;
+        await collectionRef.doc(doc.id).update({
+          'quantity': FieldValue.increment(1),
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added another "$ingredient" to your shopping list.'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        await collectionRef.add({
+          'name': ingredient,
+          'quantity': 1,
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added "$ingredient" to your shopping list.'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error adding ingredient to shopping list: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add "$ingredient" to your shopping list.'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildAboutSection() {

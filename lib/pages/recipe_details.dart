@@ -571,8 +571,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         return _buildIngredientsSection();
       case 2:
         return _buildInstructionsSection();
-      case 3:
-        return _buildNutritionSection();
       default:
         return _buildAboutSection();
     }
@@ -667,7 +665,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                   _buildNavButton('About', 0),
                   _buildNavButton('Ingredients', 1),
                   _buildNavButton('Instructions', 2),
-                  _buildNavButton('Nutrition', 3),
                 ],
               ),
             ),

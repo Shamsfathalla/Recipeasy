@@ -25,49 +25,6 @@ class FirestoreServices {
     }
   }
 
-  // Save meal preferences to Firestore
-  Future<void> saveMealPreferences({
-    required String userId,
-    required Map<String, dynamic> preferences,
-  }) async {
-    try {
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('preferences')
-          .doc('meal')
-          .set(preferences, SetOptions(merge: true));
-
-      final username = await getUsername(userId);
-      if (username != null) {
-        await _firestore
-            .collection('username_checks')
-            .doc(username.toLowerCase())
-            .collection('preferences')
-            .doc('meal')
-            .set(preferences, SetOptions(merge: true));
-      }
-    } catch (e) {
-      throw Exception('Failed to save preferences: $e');
-    }
-  }
-
-  // Get meal preferences from Firestore
-  Future<Map<String, dynamic>> getMealPreferences(String userId) async {
-    try {
-      final doc = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('preferences')
-          .doc('meal')
-          .get();
-
-      return doc.data() ?? {};
-    } catch (e) {
-      throw Exception('Failed to load preferences: $e');
-    }
-  }
-
   // Get username for a user
   Future<String?> getUsername(String userId) async {
     try {

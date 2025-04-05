@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:recipeasy/services/Spoonacular_APi';
 import 'package:recipeasy/models/meal_planning.dart';
-import 'package:recipeasy/services/firestore_services.dart';
 import 'package:recipeasy/theme_provider.dart';
 import 'package:recipeasy/pages/recipe_details.dart';
 
@@ -17,22 +16,10 @@ class MealPlansPage extends StatefulWidget {
 
 class _MealPlansPageState extends State<MealPlansPage> {
   final SpoonacularService _spoonacularService = SpoonacularService();
-  final FirestoreServices _firestoreServices = FirestoreServices();
 
   MealPlan? _mealPlan;
   bool _isLoading = false;
-  bool _isLoadingPreferences = false;
   String _errorMessage = '';
-
-  // Default preferences
-  String _timeFrame = 'day';
-  String _diet = 'None';
-  int _targetCalories = 2000;
-  int _minProtein = 50;
-  int _minCarbs = 130;
-  int _minFat = 30;
-  String _includeIngredients = '';
-  String _excludeIngredients = '';
 
   // Purple color constants
   static const Color purplePrimary = Color(0xFF6A1B9A);
@@ -42,41 +29,6 @@ class _MealPlansPageState extends State<MealPlansPage> {
   @override
   void initState() {
     super.initState();
-    _loadPreferencesAndFetchMealPlan();
-  }
-
-  Future<void> _loadPreferences() async {
-    setState(() {
-      _isLoadingPreferences = true;
-    });
-
-    try {
-      if (widget.userId.isNotEmpty) {
-        final prefs = await _firestoreServices.getMealPreferences(widget.userId);
-        if (prefs.isNotEmpty) {
-          setState(() {
-            _timeFrame = prefs['timeFrame'] ?? 'day';
-            _diet = prefs['diet'] ?? 'None';
-            _targetCalories = prefs['targetCalories'] ?? 2000;
-            _minProtein = prefs['minProtein'] ?? 50;
-            _minCarbs = prefs['minCarbs'] ?? 130;
-            _minFat = prefs['minFat'] ?? 30;
-            _includeIngredients = prefs['include'] ?? '';
-            _excludeIngredients = prefs['exclude'] ?? '';
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading preferences: $e');
-    } finally {
-      setState(() {
-        _isLoadingPreferences = false;
-      });
-    }
-  }
-
-  Future<void> _loadPreferencesAndFetchMealPlan() async {
-    await _loadPreferences();
     _fetchMealPlan();
   }
 
@@ -88,13 +40,13 @@ class _MealPlansPageState extends State<MealPlansPage> {
 
     try {
       MealPlan mealPlan = await _spoonacularService.generateMealPlan(
-        targetCalories: _targetCalories,
-        diet: _diet == 'None' ? '' : _diet,
-        minProtein: _minProtein,
-        minCarbs: _minCarbs,
-        minFat: _minFat,
-        includeIngredients: _includeIngredients,
-        excludeIngredients: _excludeIngredients,
+        targetCalories: 2000,
+        diet: '',
+        minProtein: 50,
+        minCarbs: 130,
+        minFat: 30,
+        includeIngredients: '',
+        excludeIngredients: '',
       );
 
       setState(() {
@@ -128,7 +80,7 @@ class _MealPlansPageState extends State<MealPlansPage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: _isLoading || _isLoadingPreferences
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage.isNotEmpty
           ? Center(child: Text(_errorMessage))
@@ -154,7 +106,7 @@ class _MealPlansPageState extends State<MealPlansPage> {
         padding: const EdgeInsets.all(16.0),
         children: [
           Text(
-            'Your ${_timeFrame == 'day' ? 'Daily' : _timeFrame == 'week' ? 'Weekly' : 'Monthly'} Meal Plan',
+            'Your Daily Meal Plan',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: purplePrimary,

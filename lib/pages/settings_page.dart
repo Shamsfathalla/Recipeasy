@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '/theme_provider.dart';
 import '../pages/login_register_page.dart';
-import 'meal_details.dart';
 import '/services/firestore_services.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -75,12 +74,9 @@ class SettingsPage extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyLarge,
       ),
     ),
-    _buildSettingsOption(context, Icons.restaurant_menu, 'Meal Plan Preferences',
-            () => _openMealPlanPreferences(context)),
     _buildSettingsOption(
         context, Icons.notifications, 'Notification Settings', () {}),
     _buildThemeToggleOption(context),
-    // Removed Shopping List Preferences option
   ]);
 
   Widget _buildSupportSection(BuildContext context) => _buildCard([
@@ -382,7 +378,7 @@ class SettingsPage extends StatelessWidget {
               Text('Updating username...'),
             ],
           ),
-          duration: const Duration(seconds: 10),
+          duration: Duration(seconds: 10),
         ),
       );
 
@@ -420,100 +416,6 @@ class SettingsPage extends StatelessWidget {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update username: ${e.toString()}')),
-      );
-    }
-  }
-
-  Future<void> _openMealPlanPreferences(BuildContext context) async {
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('You must be logged in to set preferences')),
-      );
-      return;
-    }
-
-    try {
-      final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Loading your preferences...'),
-            ],
-          ),
-          duration: Duration(seconds: 10),
-        ),
-      );
-
-      final prefs = await FirestoreServices().getMealPreferences(user!.uid);
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MealDetailsPage(
-            initialPreferences: prefs.isNotEmpty
-                ? prefs
-                : {
-              'timeFrame': 'day',
-              'diet': 'None',
-              'targetCalories': 2000,
-              'minProtein': 50,
-              'minCarbs': 130,
-              'minFat': 30,
-              'include': '',
-              'exclude': '',
-            },
-            onSave: (preferences) async {
-              try {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Row(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(width: 20),
-                        Text('Saving preferences...'),
-                      ],
-                    ),
-                  ),
-                );
-
-                await FirestoreServices().saveMealPreferences(
-                  userId: user!.uid,
-                  preferences: preferences,
-                );
-
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Preferences saved successfully!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to save: ${e.toString()}'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            userId: user!.uid,
-          ),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load preferences: ${e.toString()}'),
-          duration: Duration(seconds: 2),
-        ),
       );
     }
   }

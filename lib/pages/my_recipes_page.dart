@@ -8,6 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'create_recipe_page.dart';
 import 'package:recipeasy/pages/user_recipe_details_page.dart';
 
+// Color constants
+final Color lightPurple = Color.fromARGB(255, 234, 221, 255); // Light purple shade
+final Color purpleIconColor = Color.fromARGB(255, 79, 55, 139); // Purple for icons
+final Color primaryPurple = Color.fromARGB(255, 110, 59, 226); // Primary purple color
+
 class MyRecipesPage extends StatefulWidget {
   @override
   _MyRecipesPageState createState() => _MyRecipesPageState();
@@ -43,7 +48,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
   Future<void> _showCreateFolderDialog(BuildContext context) async {
     final TextEditingController controller = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    String? errorMessage; // Track duplicate folder error
+    String? errorMessage;
     await showDialog(
       context: context,
       builder: (context) {
@@ -60,7 +65,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
                       controller: controller,
                       decoration: InputDecoration(
                         labelText: 'Folder Name',
-                        errorText: errorMessage, // Show duplicate error here
+                        errorText: errorMessage,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -72,7 +77,6 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
                         return null;
                       },
                       onChanged: (value) {
-                        // Clear error when user types
                         if (errorMessage != null) {
                           setState(() => errorMessage = null);
                         }
@@ -89,7 +93,6 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
                 TextButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
-                      // Check for duplicates in real-time
                       final folders = await _folderService.getUserFolders();
                       final isDuplicate = folders.any((f) =>
                       f['name'].toLowerCase() == controller.text.toLowerCase());
@@ -116,6 +119,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -126,7 +130,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             bottom: TabBar(
-              indicatorColor: Color.fromARGB(255, 110, 59, 226),
+              indicatorColor: primaryPurple,
               tabs: [
                 Tab(text: 'Bookmarks'),
                 Tab(text: 'My Recipes'),
@@ -155,7 +159,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
               animation: tabController,
               builder: (context, child) {
                 return FloatingActionButton(
-                  backgroundColor: Color.fromARGB(255, 110, 59, 226),
+                  backgroundColor: isDarkMode ? primaryPurple : lightPurple,
                   onPressed: () async {
                     if (tabController.index == 0) {
                       await _showCreateFolderDialog(context);
@@ -167,7 +171,9 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
                     }
                   },
                   child: IconTheme(
-                    data: IconThemeData(color: Colors.white),
+                    data: IconThemeData(
+                      color: isDarkMode ? Colors.white : Color.fromARGB(255, 79, 55, 139),
+                    ),
                     child: Icon(tabController.index == 0 ? Icons.create_new_folder : Icons.add),
                   ),
                 );
@@ -269,7 +275,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
           print('Error loading recipe $recipeId: $e');
         }
       }
-      // Combine both lists
       final combinedRecipes = [...apiRecipes, ...userRecipes];
       setState(() {
         _recipes = combinedRecipes;
@@ -296,7 +301,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
       );
       return;
     }
-    // Check if folder is empty
     final recipes = await widget.folderService.getRecipesInFolder(folderId);
     final bool isFolderEmpty = recipes.isEmpty;
     final shouldDelete = await showDialog<bool>(
@@ -320,7 +324,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
       ),
     ) ?? false;
     if (!shouldDelete) return;
-    // Only show the additional prompt if folder has recipes
     bool deleteFromAll = false;
     if (!isFolderEmpty) {
       deleteFromAll = await showDialog<bool>(
@@ -572,12 +575,12 @@ class _BookmarksPageState extends State<BookmarksPage> {
                         }
                       },
                       backgroundColor: _selectedFolderId == 'general'
-                          ? Color.fromARGB(255, 110, 59, 226).withOpacity(0.2)
-                          : Color.fromARGB(255, 110, 59, 226).withOpacity(0.1),
-                      selectedColor: Color.fromARGB(255, 110, 59, 226).withOpacity(0.4),
+                          ? primaryPurple.withOpacity(0.2)
+                          : primaryPurple.withOpacity(0.1),
+                      selectedColor: primaryPurple.withOpacity(0.4),
                       labelStyle: TextStyle(
                         color: _selectedFolderId == 'general'
-                            ? Color.fromARGB(255, 110, 59, 226)
+                            ? primaryPurple
                             : unselectedTextColor,
                         fontWeight: FontWeight.w500,
                       ),
@@ -598,12 +601,12 @@ class _BookmarksPageState extends State<BookmarksPage> {
                         }
                       },
                       backgroundColor: _selectedFolderId == folder['id']
-                          ? Color.fromARGB(255, 110, 59, 226).withOpacity(0.2)
-                          : Color.fromARGB(255, 110, 59, 226).withOpacity(0.1),
-                      selectedColor: Color.fromARGB(255, 110, 59, 226).withOpacity(0.4),
+                          ? primaryPurple.withOpacity(0.2)
+                          : primaryPurple.withOpacity(0.1),
+                      selectedColor: primaryPurple.withOpacity(0.4),
                       labelStyle: TextStyle(
                         color: _selectedFolderId == folder['id']
-                            ? Color.fromARGB(255, 110, 59, 226)
+                            ? primaryPurple
                             : unselectedTextColor,
                         fontWeight: FontWeight.w500,
                       ),
@@ -626,7 +629,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color.fromARGB(255, 110, 59, 226),
+                  color: primaryPurple,
                 ),
               ),
               if (_selectedFolderId != 'general')
@@ -700,7 +703,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
                       },
                     ),
                     onTap: () {
-                      final recipeId = _recipes[index]['id']; // Changed from 'recipeId' to 'id'
+                      final recipeId = _recipes[index]['id'];
                       final isUserRecipe = recipeId is String;
 
                       if (isUserRecipe) {

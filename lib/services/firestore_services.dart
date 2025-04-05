@@ -114,4 +114,25 @@ class FirestoreServices {
       throw Exception('Failed to get user by username: $e');
     }
   }
+
+  Future<void> saveMealPlanPreferences({
+    required String userId,
+    required int calories,
+    required int protein,
+    required int carbs,
+    required int fat,
+  }) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'mealPlanPreferences': {
+          'calories': calories,
+          'protein': protein,
+          'carbs': carbs,
+          'fat': fat,
+        },
+      });
+    } catch (e) {
+      throw Exception('Failed to save meal plan preferences: $e');
+    }
+  }
 }

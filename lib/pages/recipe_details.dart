@@ -159,14 +159,13 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                       value: _isGeneralSelected || _areOtherFoldersSelected,
                       onChanged: (value) {
                         if (_areOtherFoldersSelected && value == false) {
-                          // Don't allow unselecting General if other folders are selected
                           return;
                         }
                         setState(() {
                           _isGeneralSelected = value ?? false;
                         });
                       },
-                      activeColor: const Color.fromRGBO(110, 59, 226, 1),
+                      activeColor: const Color.fromRGBO(120, 60, 219, 1),
                     ),
                     if (_folders.isEmpty)
                       const Text('No folders available')
@@ -180,7 +179,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                               _isRecipeInFolder[folder['id']] = value!;
                             });
                           },
-                          activeColor: const Color.fromRGBO(110, 59, 226, 1),
+                          activeColor: const Color.fromRGBO(120, 60, 219, 1),
                         );
                       }).toList(),
                   ],
@@ -250,7 +249,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
       _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((value) => value);
     });
 
-    // Show success message
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -317,7 +315,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: const Color.fromRGBO(110, 59, 226, 1),
+          color: const Color.fromRGBO(120, 60, 219, 1),
         ),
       ),
     );
@@ -344,7 +342,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 6, right: 8),
-            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(110, 59, 226, 1)),
+            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(120, 60, 219, 1)),
           ),
           Expanded(
             child: Text(
@@ -482,7 +480,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: const Color.fromRGBO(110, 59, 226, 1),
+                      color: const Color.fromRGBO(120, 60, 219, 1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -576,8 +574,10 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     }
   }
 
-  Widget _buildNavButton(String text, int index) {
+  Widget _buildNavButton(String text, int index, BuildContext context) {
     final isSelected = _currentSectionIndex == index;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return TextButton(
       onPressed: () {
         setState(() {
@@ -585,7 +585,9 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         });
       },
       style: TextButton.styleFrom(
-        foregroundColor: isSelected ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+        foregroundColor: isSelected
+            ? const Color.fromRGBO(120, 60, 219, 1)
+            : isDarkMode ? Colors.white : Colors.black,
         textStyle: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
@@ -596,10 +598,38 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recipe Details'),
+        title: const Text(
+          'Recipe Details',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromRGBO(161, 63, 190, 1),
+                Color.fromRGBO(120, 60, 219, 1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
+        actionsIconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -616,7 +646,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               onPressed: _fetchRecipeDetails,
               style: ElevatedButton.styleFrom(
                 foregroundColor: Colors.white,
-                backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
+                backgroundColor: const Color.fromRGBO(120, 60, 219, 1),
               ),
               child: const Text('Retry'),
             ),
@@ -648,7 +678,9 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                   IconButton(
                     icon: Icon(
                       _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+                      color: _isBookmarked
+                          ? const Color.fromRGBO(120, 60, 219, 1)
+                          : isDarkMode ? Colors.white : Colors.black,
                       size: 30,
                     ),
                     onPressed: _showFolderDialog,
@@ -662,9 +694,9 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildNavButton('About', 0),
-                  _buildNavButton('Ingredients', 1),
-                  _buildNavButton('Instructions', 2),
+                  _buildNavButton('About', 0, context),
+                  _buildNavButton('Ingredients', 1, context),
+                  _buildNavButton('Instructions', 2, context),
                 ],
               ),
             ),

@@ -1,4 +1,3 @@
-// lib/pages/user_recipe_details_page.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,7 +14,7 @@ class UserRecipeDetailsPage extends StatefulWidget {
   });
 
   @override
-  _UserRecipeDetailsPageState createState() => _UserRecipeDetailsPageState();
+  State<UserRecipeDetailsPage> createState() => _UserRecipeDetailsPageState();
 }
 
 class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
@@ -51,6 +50,7 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
           .collection('recipes')
           .doc(widget.recipeId)
           .get();
+
       if (snapshot.exists) {
         setState(() {
           _recipeDetails = Recipe.fromJson(snapshot.data()!);
@@ -63,12 +63,10 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
       debugPrint('Error fetching recipe details: $e');
     }
   }
@@ -78,19 +76,18 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
     setState(() {
       _folders = folders.where((folder) => folder['id'] != 'general').toList();
     });
-    // Check General folder
+
     _isGeneralSelected = await _checkIfRecipeInFolder('general');
-    // Check other folders
+
     bool isInAnyOtherFolder = false;
     for (final folder in _folders) {
       final isInFolder = await _checkIfRecipeInFolder(folder['id']);
       setState(() {
         _isRecipeInFolder[folder['id']] = isInFolder;
       });
-      if (isInFolder) {
-        isInAnyOtherFolder = true;
-      }
+      if (isInFolder) isInAnyOtherFolder = true;
     }
+
     setState(() {
       _isBookmarked = _isGeneralSelected || isInAnyOtherFolder;
     });
@@ -138,23 +135,18 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
                             icon: const Icon(Icons.add),
                             onPressed: () async {
                               final folderName = _newFolderController.text.trim();
-                              if (folderName.isNotEmpty) {
-                                if (_folders.any((folder) => folder['name'] == folderName)) {
-                                  setState(() {
-                                    _errorMessage = 'Folder with this name already exists.';
-                                  });
-                                  return;
-                                }
+                              if (folderName.isEmpty) return;
+
+                              if (_folders.any((folder) => folder['name'] == folderName)) {
                                 setState(() {
-                                  _errorMessage = null;
+                                  _errorMessage = 'Folder already exists';
                                 });
-                                await _folderService.createFolder(folderName);
-                                _newFolderController.clear();
-                                await _loadFolders();
-                                if (mounted) {
-                                  setState(() {});
-                                }
+                                return;
                               }
+
+                              await _folderService.createFolder(folderName);
+                              _newFolderController.clear();
+                              await _loadFolders();
                             },
                           ),
                         ],
@@ -163,33 +155,24 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
                     const Divider(),
                     CheckboxListTile(
                       title: const Text('General'),
-                      value: _isGeneralSelected || _isRecipeInFolder.values.any((value) => value),
+                      value: _isGeneralSelected || _isRecipeInFolder.values.any((v) => v),
                       onChanged: (value) {
-                        if (_isRecipeInFolder.values.any((value) => value) && value == false) {
-                          // Don't allow unselecting General if other folders are selected
-                          return;
-                        }
-                        setState(() {
-                          _isGeneralSelected = value ?? false;
-                        });
+                        if (_isRecipeInFolder.values.any((v) => v) && value == false) return;
+                        setState(() => _isGeneralSelected = value ?? false);
                       },
                       activeColor: const Color.fromRGBO(110, 59, 226, 1),
                     ),
                     if (_folders.isEmpty)
                       const Text('No folders available')
                     else
-                      ..._folders.map((folder) {
-                        return CheckboxListTile(
-                          title: Text(folder['name']),
-                          value: _isRecipeInFolder[folder['id']] ?? false,
-                          onChanged: (value) {
-                            setState(() {
-                              _isRecipeInFolder[folder['id']] = value!;
-                            });
-                          },
-                          activeColor: const Color.fromRGBO(110, 59, 226, 1),
-                        );
-                      }).toList(),
+                      ..._folders.map((folder) => CheckboxListTile(
+                        title: Text(folder['name']),
+                        value: _isRecipeInFolder[folder['id']] ?? false,
+                        onChanged: (value) {
+                          setState(() => _isRecipeInFolder[folder['id']] = value!);
+                        },
+                        activeColor: const Color.fromRGBO(110, 59, 226, 1),
+                      )),
                   ],
                 ),
               ),
@@ -214,14 +197,14 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
   }
 
   Future<void> _updateFolders() async {
-    final isCurrentlyInGeneral = await _checkIfRecipeInFolder('general');
     // Handle General folder
-    if (_isGeneralSelected && !isCurrentlyInGeneral) {
+    final isInGeneral = await _checkIfRecipeInFolder('general');
+    if (_isGeneralSelected && !isInGeneral) {
       await _folderService.addRecipeToFolder(
         folderId: 'general',
         recipeId: widget.recipeId,
       );
-    } else if (!_isGeneralSelected && isCurrentlyInGeneral) {
+    } else if (!_isGeneralSelected && isInGeneral) {
       final recipes = await _folderService.getRecipesInFolder('general');
       final recipeDoc = recipes.firstWhere(
             (recipe) => recipe['recipeId'] == widget.recipeId,
@@ -231,17 +214,19 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
         recipeDocId: recipeDoc['id'],
       );
     }
+
     // Handle other folders
     for (final folder in _folders) {
       final folderId = folder['id'];
       final shouldBeInFolder = _isRecipeInFolder[folderId] ?? false;
-      final isCurrentlyInFolder = await _checkIfRecipeInFolder(folderId);
-      if (shouldBeInFolder && !isCurrentlyInFolder) {
+      final isInFolder = await _checkIfRecipeInFolder(folderId);
+
+      if (shouldBeInFolder && !isInFolder) {
         await _folderService.addRecipeToFolder(
           folderId: folderId,
           recipeId: widget.recipeId,
         );
-      } else if (!shouldBeInFolder && isCurrentlyInFolder) {
+      } else if (!shouldBeInFolder && isInFolder) {
         final recipes = await _folderService.getRecipesInFolder(folderId);
         final recipeDoc = recipes.firstWhere(
               (recipe) => recipe['recipeId'] == widget.recipeId,
@@ -252,26 +237,21 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
         );
       }
     }
-    // Update bookmark status
+
     setState(() {
-      _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((value) => value);
+      _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((v) => v);
     });
-    // Show success message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isBookmarked
-                ? 'Recipe saved to your folders!'
-                : 'Recipe removed from your folders',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-    if (widget.onFolderUpdated != null) {
-      widget.onFolderUpdated!();
-    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isBookmarked
+            ? 'Recipe saved to folders!'
+            : 'Recipe removed from folders'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    widget.onFolderUpdated?.call();
   }
 
   Widget _buildSectionTitle(String text) {
@@ -279,10 +259,10 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         text,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: const Color.fromRGBO(110, 59, 226, 1),
+          color: Color.fromRGBO(110, 59, 226, 1),
         ),
       ),
     );
@@ -293,10 +273,7 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 16,
-          height: 1.5,
-        ),
+        style: const TextStyle(fontSize: 16, height: 1.5),
       ),
     );
   }
@@ -309,19 +286,16 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 6, right: 8),
-            child: Icon(Icons.circle, size: 8, color: const Color.fromRGBO(110, 59, 226, 1)),
-          ),
-          Expanded(
-            child: Text(
-              ingredient,
-              style: const TextStyle(fontSize: 16),
+            child: Icon(
+              Icons.circle,
+              size: 8,
+              color: const Color.fromRGBO(110, 59, 226, 1),
             ),
           ),
+          Expanded(child: Text(ingredient, style: const TextStyle(fontSize: 16))),
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () {
-              _addIngredientToShoppingList(ingredient);
-            },
+            onPressed: () => _addIngredientToShoppingList(ingredient),
           ),
         ],
       ),
@@ -330,58 +304,53 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
 
   Future<void> _addIngredientToShoppingList(String ingredient) async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = _auth.currentUser;
       if (user == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please log in to add ingredients to your shopping list.'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to add ingredients'),
+            duration: Duration(seconds: 3),
+          ),
+        );
         return;
       }
-      final collectionRef = FirebaseFirestore.instance.collection('users/${user.uid}/shopping_list');
-      final querySnapshot = await collectionRef.where('name', isEqualTo: ingredient).get();
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        await collectionRef.doc(doc.id).update({
+
+      final collection = FirebaseFirestore.instance
+          .collection('users/${user.uid}/shopping_list');
+
+      final query = await collection.where('name', isEqualTo: ingredient).get();
+
+      if (query.docs.isNotEmpty) {
+        await collection.doc(query.docs.first.id).update({
           'quantity': FieldValue.increment(1),
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added another "$ingredient" to your shopping list.'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added another "$ingredient"'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       } else {
-        await collectionRef.add({
+        await collection.add({
           'name': ingredient,
           'quantity': 1,
           'addedAt': FieldValue.serverTimestamp(),
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added "$ingredient" to your shopping list.'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error adding ingredient to shopping list: $e');
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add "$ingredient" to your shopping list.'),
-            duration: const Duration(seconds: 3),
+            content: Text('Added "$ingredient"'),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
+    } catch (e) {
+      debugPrint('Error adding ingredient: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add ingredient'),
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -400,7 +369,7 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('Ingredients'),
-        ..._recipeDetails!.ingredients.map<Widget>(_buildIngredientItem).toList(),
+        ..._recipeDetails!.ingredients.map(_buildIngredientItem).toList(),
       ],
     );
   }
@@ -411,25 +380,26 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
       children: [
         _buildSectionTitle('Instructions'),
         if (_recipeDetails!.instructions.isEmpty)
-          _buildTextContent('No instructions available.')
+          _buildTextContent('No instructions available')
         else
           ..._recipeDetails!.instructions.map((step) {
+            final index = _recipeDetails!.instructions.indexOf(step) + 1;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(right: 12, top: 4),
                     width: 24,
                     height: 24,
+                    margin: const EdgeInsets.only(right: 12, top: 4),
                     decoration: BoxDecoration(
                       color: const Color.fromRGBO(110, 59, 226, 1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
                       child: Text(
-                        '${_recipeDetails!.instructions.indexOf(step) + 1}',
+                        '$index',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -438,12 +408,7 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      step.trim(),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
+                  Expanded(child: Text(step.trim(), style: const TextStyle(fontSize: 16))),
                 ],
               ),
             );
@@ -455,27 +420,24 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
   Widget _buildCurrentSection() {
     if (_recipeDetails == null) return const SizedBox();
     switch (_currentSectionIndex) {
-      case 0:
-        return _buildAboutSection();
-      case 1:
-        return _buildIngredientsSection();
-      case 2:
-        return _buildInstructionsSection();
-      default:
-        return _buildAboutSection();
+      case 0: return _buildAboutSection();
+      case 1: return _buildIngredientsSection();
+      case 2: return _buildInstructionsSection();
+      default: return _buildAboutSection();
     }
   }
 
   Widget _buildNavButton(String text, int index) {
     final isSelected = _currentSectionIndex == index;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final unselectedColor = isDarkMode ? Colors.white : Colors.black;
+
     return TextButton(
-      onPressed: () {
-        setState(() {
-          _currentSectionIndex = index;
-        });
-      },
+      onPressed: () => setState(() => _currentSectionIndex = index),
       style: TextButton.styleFrom(
-        foregroundColor: isSelected ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
+        foregroundColor: isSelected
+            ? const Color.fromRGBO(110, 59, 226, 1)
+            : unselectedColor,
         textStyle: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
@@ -486,10 +448,28 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final unselectedColor = isDarkMode ? Colors.white : Colors.black;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recipe Details'),
-        elevation: 0,
+        title: const Text(
+          'Recipe Details',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromRGBO(161, 63, 190, 1),
+                Color.fromRGBO(120, 60, 219, 1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -500,63 +480,56 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
           children: [
             const Icon(Icons.error_outline, size: 50, color: Colors.red),
             const SizedBox(height: 16),
-            const Text('Failed to load recipe details.'),
+            const Text('Failed to load recipe'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchRecipeDetails,
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
-              ),
               child: const Text('Retry'),
             ),
           ],
         ),
       )
           : SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      _recipeDetails!.title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    _recipeDetails!.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isBookmarked ? const Color.fromRGBO(110, 59, 226, 1) : Colors.grey,
-                      size: 30,
-                    ),
-                    onPressed: _showFolderDialog,
-                    tooltip: 'Bookmark recipe',
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    color: _isBookmarked
+                        ? const Color.fromRGBO(110, 59, 226, 1)
+                        : unselectedColor,
+                    size: 30,
                   ),
-                ],
-              ),
+                  onPressed: _showFolderDialog,
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavButton('About', 0),
-                  _buildNavButton('Ingredients', 1),
-                  _buildNavButton('Instructions', 2),
-                ],
-              ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavButton('About', 0),
+                _buildNavButton('Ingredients', 1),
+                _buildNavButton('Instructions', 2),
+              ],
             ),
+            const SizedBox(height: 16),
             _buildCurrentSection(),
           ],
         ),

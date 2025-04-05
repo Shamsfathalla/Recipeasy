@@ -208,13 +208,12 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.person, color: Colors.white),
           onPressed: () async {
             await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ProfilePage(user: FirebaseAuth.instance.currentUser!),
-              ),
-            );
-            _resetHomePage();
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ProfilePage(user: FirebaseAuth.instance.currentUser!),
+                ));
+                _resetHomePage();
           },
         ),
         title: const Text(
@@ -313,6 +312,8 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   final ScrollController _scrollController = ScrollController();
   bool _isLoadingMore = false;
+  bool _isRefreshingExplore = false;
+  bool _isRefreshingCommunity = false;
 
   @override
   void initState() {
@@ -353,6 +354,18 @@ class _HomeContentState extends State<HomeContent> {
         _isLoadingMore = false;
       });
     });
+  }
+
+  Future<void> _refreshExploreRecipes() async {
+    setState(() => _isRefreshingExplore = true);
+    await widget.fetchRandomRecipes();
+    setState(() => _isRefreshingExplore = false);
+  }
+
+  Future<void> _refreshCommunityRecipes() async {
+    setState(() => _isRefreshingCommunity = true);
+    await widget.fetchCommunityRecipes();
+    setState(() => _isRefreshingCommunity = false);
   }
 
   @override
@@ -402,9 +415,15 @@ class _HomeContentState extends State<HomeContent> {
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           const Spacer(),
-                          IconButton(
+                          _isRefreshingExplore
+                              ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : IconButton(
                             icon: const Icon(Icons.refresh),
-                            onPressed: () => widget.fetchRandomRecipes(),
+                            onPressed: _refreshExploreRecipes,
                           ),
                         ],
                       ),
@@ -420,30 +439,8 @@ class _HomeContentState extends State<HomeContent> {
                                 final recipe = widget.exploreRecipes[index];
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 4),
-                                  child: ListTile(
-                                    leading: recipe['image'] != null &&
-                                        recipe['image'].isNotEmpty
-                                        ? Image.network(
-                                      recipe['image'],
-                                      width: 50,
-                                      height: 50,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(Icons.image_not_supported);
-                                      },
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const SizedBox(
-                                          width: 50,
-                                          height: 50,
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        );
-                                      },
-                                    )
-                                        : const Icon(Icons.image_not_supported),
-                                    title: Text(recipe['title'] ?? 'Untitled Recipe'),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(4),
                                     onTap: () {
                                       if (recipe['id'] != null) {
                                         Navigator.push(
@@ -454,6 +451,45 @@ class _HomeContentState extends State<HomeContent> {
                                         );
                                       }
                                     },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Row(
+                                        children: [
+                                          recipe['image'] != null &&
+                                              recipe['image'].isNotEmpty
+                                              ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(8.0),
+                                            child: Image.network(
+                                              recipe['image'],
+                                              width: 50,
+                                              height: 50,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return const Icon(Icons.image_not_supported);
+                                              },
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return const SizedBox(
+                                                  width: 50,
+                                                  height: 50,
+                                                  child: Center(
+                                                    child: CircularProgressIndicator(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                              : const Icon(Icons.image_not_supported),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              recipe['title'] ?? 'Untitled Recipe',
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               },
@@ -463,7 +499,7 @@ class _HomeContentState extends State<HomeContent> {
                                 onPressed: () {
                                   widget.setExploreRecipesLimit(widget.exploreRecipesLimit == 5 ? 10 : 5);
                                 },
-                                child: Text(widget.exploreRecipesLimit == 5 ? 'Expand' : 'Contract'),
+                                child: Text(widget.exploreRecipesLimit == 5 ? 'Show More' : 'Show Less'),
                               ),
                           ],
                         )
@@ -473,13 +509,19 @@ class _HomeContentState extends State<HomeContent> {
                       Row(
                         children: [
                           const Text(
-                            'Explore Community Recipes',
+                            'Community Recipes',
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           const Spacer(),
-                          IconButton(
+                          _isRefreshingCommunity
+                              ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                              : IconButton(
                             icon: const Icon(Icons.refresh),
-                            onPressed: () => widget.fetchCommunityRecipes(),
+                            onPressed: _refreshCommunityRecipes,
                           ),
                         ],
                       ),
@@ -495,30 +537,8 @@ class _HomeContentState extends State<HomeContent> {
                                 final recipe = widget.communityRecipes[index];
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 4),
-                                  child: ListTile(
-                                    leading: recipe['image'] != null &&
-                                        recipe['image'].isNotEmpty
-                                        ? Image.network(
-                                      recipe['image'],
-                                      width: 50,
-                                      height: 50,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Icon(Icons.image_not_supported);
-                                      },
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const SizedBox(
-                                          width: 50,
-                                          height: 50,
-                                          child: Center(
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        );
-                                      },
-                                    )
-                                        : const Icon(Icons.image_not_supported),
-                                    title: Text(recipe['title'] ?? 'Untitled Recipe'),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(4),
                                     onTap: () {
                                       if (recipe['id'] != null) {
                                         if (recipe['source'] == 'user') {
@@ -538,6 +558,45 @@ class _HomeContentState extends State<HomeContent> {
                                         }
                                       }
                                     },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Row(
+                                        children: [
+                                          recipe['image'] != null &&
+                                              recipe['image'].isNotEmpty
+                                              ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(8.0),
+                                            child: Image.network(
+                                              recipe['image'],
+                                              width: 50,
+                                              height: 50,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return const Icon(Icons.image_not_supported);
+                                              },
+                                              loadingBuilder: (context, child, loadingProgress) {
+                                                if (loadingProgress == null) return child;
+                                                return const SizedBox(
+                                                  width: 50,
+                                                  height: 50,
+                                                  child: Center(
+                                                    child: CircularProgressIndicator(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                              : const Icon(Icons.image_not_supported),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              recipe['title'] ?? 'Untitled Recipe',
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               },
@@ -547,7 +606,7 @@ class _HomeContentState extends State<HomeContent> {
                                 onPressed: () {
                                   widget.setCommunityRecipesLimit(widget.communityRecipesLimit == 5 ? 10 : 5);
                                 },
-                                child: Text(widget.communityRecipesLimit == 5 ? 'Expand' : 'Contract'),
+                                child: Text(widget.communityRecipesLimit == 5 ? 'Show More' : 'Show Less'),
                               ),
                           ],
                         )
@@ -579,20 +638,8 @@ class _HomeContentState extends State<HomeContent> {
                   final recipe = widget.recipes[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    child: ListTile(
-                      leading: recipe['image'] != null &&
-                          recipe['image'].isNotEmpty
-                          ? Image.network(
-                        recipe['image'],
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.image_not_supported);
-                        },
-                      )
-                          : const Icon(Icons.image_not_supported),
-                      title: Text(recipe['title'] ?? 'Untitled Recipe'),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(4),
                       onTap: () {
                         if (recipe['id'] != null) {
                           if (recipe['source'] == 'user') {
@@ -612,6 +659,35 @@ class _HomeContentState extends State<HomeContent> {
                           }
                         }
                       },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            recipe['image'] != null &&
+                                recipe['image'].isNotEmpty
+                                ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.network(
+                                recipe['image'],
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(Icons.image_not_supported);
+                                },
+                              ),
+                            )
+                                : const Icon(Icons.image_not_supported),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                recipe['title'] ?? 'Untitled Recipe',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   );
                 },

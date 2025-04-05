@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Color constants
+final Color lightPurple = Color.fromARGB(255, 234, 221, 255); // Light purple shade
+final Color purpleIconColor = Color.fromARGB(255, 79, 55, 139); // Purple for icons
+final Color primaryPurple = Color.fromARGB(255, 110, 59, 226); // Primary purple color
+
 void main() {
   runApp(MyApp());
 }
@@ -9,10 +14,9 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Color.fromRGBO(110, 59, 226, 1);
     return MaterialApp(
       theme: ThemeData(
-        primaryColor: primaryColor,
+        primaryColor: primaryPurple,
         scaffoldBackgroundColor: Colors.white,
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.white,
@@ -20,12 +24,20 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Colors.black),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: primaryColor,
+          backgroundColor: primaryPurple,
           foregroundColor: Colors.white,
+        ),
+        checkboxTheme: CheckboxThemeData(
+          fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return primaryPurple;
+            }
+            return Colors.grey;
+          }),
         ),
       ),
       darkTheme: ThemeData(
-        primaryColor: primaryColor,
+        primaryColor: primaryPurple,
         scaffoldBackgroundColor: Colors.grey[900],
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey[900],
@@ -33,8 +45,16 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Colors.white),
         ),
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: primaryColor,
+          backgroundColor: primaryPurple,
           foregroundColor: Colors.white,
+        ),
+        checkboxTheme: CheckboxThemeData(
+          fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+            if (states.contains(MaterialState.selected)) {
+              return primaryPurple;
+            }
+            return Colors.grey;
+          }),
         ),
       ),
       home: ShopListPage(),
@@ -50,7 +70,6 @@ class ShopListPage extends StatefulWidget {
 class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _showFab = true;
-  final primaryColor = Color.fromRGBO(110, 59, 226, 1);
 
   @override
   void initState() {
@@ -74,6 +93,8 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(kToolbarHeight),
@@ -82,13 +103,9 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
           bottom: TabBar(
             controller: _tabController,
             isScrollable: false,
-            indicatorColor: primaryColor,
-            labelColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : primaryColor,
-            unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
-                ? Colors.grey[400]
-                : Colors.grey[700],
+            indicatorColor: primaryPurple,
+            labelColor: isDarkMode ? Colors.white : primaryPurple,
+            unselectedLabelColor: isDarkMode ? Colors.grey[400] : Colors.grey[700],
             tabs: [
               Tab(text: 'Current List'),
               Tab(text: 'History'),
@@ -108,8 +125,11 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
         onPressed: () {
           _showAddIngredientDialog();
         },
-        child: Icon(Icons.add, color: Colors.white),
-        backgroundColor: primaryColor,
+        child: Icon(
+          Icons.add,
+          color: isDarkMode ? Colors.white : purpleIconColor,
+        ),
+        backgroundColor: isDarkMode ? primaryPurple : lightPurple,
       )
           : null,
     );
@@ -155,7 +175,6 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
       final querySnapshot = await collectionRef.where('name', isEqualTo: ingredient).get();
       if (querySnapshot.docs.isNotEmpty) {
         if (manual) {
-          // Show error message if the ingredient already exists and it's a manual addition
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Ingredient "$ingredient" already exists in your shopping list.'),
@@ -163,7 +182,6 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
             ),
           );
         } else {
-          // Increment the quantity if the ingredient already exists and it's not a manual addition
           final doc = querySnapshot.docs.first;
           await collectionRef.doc(doc.id).update({
             'quantity': FieldValue.increment(1),
@@ -176,7 +194,6 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
           );
         }
       } else {
-        // Add a new document if the ingredient does not exist
         await collectionRef.add({
           'name': ingredient,
           'quantity': 1,
@@ -207,10 +224,14 @@ class CurrentShopList extends StatefulWidget {
 }
 
 class _CurrentShopListState extends State<CurrentShopList> {
-  Stream<QuerySnapshot> _shoppingListStream = FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').snapshots();
+  Stream<QuerySnapshot> _shoppingListStream = FirebaseFirestore.instance
+      .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+      .snapshots();
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return StreamBuilder<QuerySnapshot>(
       stream: _shoppingListStream,
       builder: (context, snapshot) {
@@ -218,12 +239,15 @@ class _CurrentShopListState extends State<CurrentShopList> {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: primaryPurple));
         }
         final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
         if (documents.isEmpty) {
           return Center(
-            child: Text('Your shopping list is empty.'),
+            child: Text(
+              'Your shopping list is empty.',
+              style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+            ),
           );
         }
         return ListView.builder(
@@ -240,24 +264,37 @@ class _CurrentShopListState extends State<CurrentShopList> {
               ),
               elevation: 3.0,
               margin: EdgeInsets.symmetric(vertical: 6.0),
+              color: isDarkMode ? Colors.grey[800] : Colors.white,
               child: ListTile(
-                title: Text(name),
-                subtitle: Text('Quantity: $quantity'),
+                title: Text(
+                  name,
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                ),
+                subtitle: Text(
+                  'Quantity: $quantity',
+                  style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                ),
                 leading: Checkbox(
                   value: data['bought'] ?? false,
                   onChanged: (bool? value) async {
-                    await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
-                      'bought': value,
-                    });
+                    await FirebaseFirestore.instance
+                        .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+                        .doc(doc.id)
+                        .update({'bought': value});
                     if (value == true) {
-                      await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').add({
+                      await FirebaseFirestore.instance
+                          .collection('users/${FirebaseAuth.instance.currentUser!.uid}/history')
+                          .add({
                         'name': name,
                         'quantity': quantity,
                         'addedAt': FieldValue.serverTimestamp(),
                       });
-                      await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).delete();
+                      await FirebaseFirestore.instance
+                          .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+                          .doc(doc.id)
+                          .delete();
                     }
-                    setState(() {}); // Refresh the list
+                    setState(() {});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(value! ? 'Marked "$name" as bought' : 'Unmarked "$name" as bought'),
@@ -270,12 +307,13 @@ class _CurrentShopListState extends State<CurrentShopList> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.remove),
+                      icon: Icon(Icons.remove, color: isDarkMode ? Colors.white : purpleIconColor),
                       onPressed: () async {
                         if (quantity > 1) {
-                          await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
-                            'quantity': FieldValue.increment(-1),
-                          });
+                          await FirebaseFirestore.instance
+                              .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+                              .doc(doc.id)
+                              .update({'quantity': FieldValue.increment(-1)});
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Decremented "$name" quantity in your shopping list.'),
@@ -283,7 +321,10 @@ class _CurrentShopListState extends State<CurrentShopList> {
                             ),
                           );
                         } else {
-                          await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).delete();
+                          await FirebaseFirestore.instance
+                              .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+                              .doc(doc.id)
+                              .delete();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Removed "$name" from your shopping list.'),
@@ -291,16 +332,17 @@ class _CurrentShopListState extends State<CurrentShopList> {
                             ),
                           );
                         }
-                        setState(() {}); // Refresh the list
+                        setState(() {});
                       },
                     ),
                     IconButton(
-                      icon: Icon(Icons.add),
+                      icon: Icon(Icons.add, color: isDarkMode ? Colors.white : purpleIconColor),
                       onPressed: () async {
-                        await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list').doc(doc.id).update({
-                          'quantity': FieldValue.increment(1),
-                        });
-                        setState(() {}); // Refresh the list
+                        await FirebaseFirestore.instance
+                            .collection('users/${FirebaseAuth.instance.currentUser!.uid}/shopping_list')
+                            .doc(doc.id)
+                            .update({'quantity': FieldValue.increment(1)});
+                        setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Incremented "$name" quantity in your shopping list.'),
@@ -322,11 +364,16 @@ class _CurrentShopListState extends State<CurrentShopList> {
 
 class HistoryShopList extends StatelessWidget {
   final Stream<QuerySnapshot> _historyStream;
+
   HistoryShopList()
-      : _historyStream = FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').snapshots();
+      : _historyStream = FirebaseFirestore.instance
+      .collection('users/${FirebaseAuth.instance.currentUser!.uid}/history')
+      .snapshots();
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return StreamBuilder<QuerySnapshot>(
       stream: _historyStream,
       builder: (context, snapshot) {
@@ -334,12 +381,15 @@ class HistoryShopList extends StatelessWidget {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return Center(child: CircularProgressIndicator(color: primaryPurple));
         }
         final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
         if (documents.isEmpty) {
           return Center(
-            child: Text('Your history is empty.'),
+            child: Text(
+              'Your history is empty.',
+              style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+            ),
           );
         }
         return ListView.builder(
@@ -356,22 +406,32 @@ class HistoryShopList extends StatelessWidget {
               ),
               elevation: 3.0,
               margin: EdgeInsets.symmetric(vertical: 6.0),
+              color: isDarkMode ? Colors.grey[800] : Colors.white,
               child: ListTile(
-                title: Text(name),
-                subtitle: Text('Quantity: $quantity'),
-                leading: Icon(Icons.history, color: Theme.of(context).iconTheme.color),
+                title: Text(
+                  name,
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                ),
+                subtitle: Text(
+                  'Quantity: $quantity',
+                  style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                ),
+                leading: Icon(
+                  Icons.history,
+                  color: isDarkMode ? Colors.white : purpleIconColor,
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.add),
+                      icon: Icon(Icons.add, color: isDarkMode ? Colors.white : purpleIconColor),
                       onPressed: () async {
                         final user = FirebaseAuth.instance.currentUser;
                         if (user == null) return;
-                        final collectionRef = FirebaseFirestore.instance.collection('users/${user.uid}/shopping_list');
+                        final collectionRef = FirebaseFirestore.instance
+                            .collection('users/${user.uid}/shopping_list');
                         final querySnapshot = await collectionRef.where('name', isEqualTo: name).get();
                         if (querySnapshot.docs.isNotEmpty) {
-                          // Increment the quantity if the ingredient already exists
                           final doc = querySnapshot.docs.first;
                           await collectionRef.doc(doc.id).update({
                             'quantity': FieldValue.increment(1),
@@ -383,7 +443,6 @@ class HistoryShopList extends StatelessWidget {
                             ),
                           );
                         } else {
-                          // Add a new document if the ingredient does not exist
                           await collectionRef.add({
                             'name': name,
                             'quantity': quantity,
@@ -399,9 +458,12 @@ class HistoryShopList extends StatelessWidget {
                       },
                     ),
                     IconButton(
-                      icon: Icon(Icons.delete),
+                      icon: Icon(Icons.delete, color: Colors.red),
                       onPressed: () async {
-                        await FirebaseFirestore.instance.collection('users/${FirebaseAuth.instance.currentUser!.uid}/history').doc(doc.id).delete();
+                        await FirebaseFirestore.instance
+                            .collection('users/${FirebaseAuth.instance.currentUser!.uid}/history')
+                            .doc(doc.id)
+                            .delete();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Removed "$name" from your history.'),

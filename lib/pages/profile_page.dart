@@ -465,13 +465,16 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color.fromRGBO(168, 64, 185, 1),
-                Color.fromRGBO(110, 59, 226, 1),
+                Color.fromRGBO(161, 63, 190, 1), // RGB: 161 63 190
+                Color.fromRGBO(120, 60, 219, 1), // RGB: 120 60 219
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
         ),
       ),
       body: Column(
@@ -668,13 +671,16 @@ class _AddFriendPageState extends State<_AddFriendPage> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color.fromRGBO(168, 64, 185, 1),
-                Color.fromRGBO(110, 59, 226, 1),
+                Color.fromRGBO(161, 63, 190, 1),
+                Color.fromRGBO(120, 60, 219, 1),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
+        ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
         ),
       ),
       body: Column(

@@ -1,8 +1,12 @@
+// lib/pages/my_recipes_page.dart
 import 'package:flutter/material.dart';
+import 'package:recipeasy/models/recipe_model.dart';
 import 'package:recipeasy/services/recipe_folder_service.dart';
-import 'package:recipeasy/services/Spoonacular_API';
+import 'package:recipeasy/services/spoonacular_api';
 import 'package:recipeasy/pages/recipe_details.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'create_recipe_page.dart';
+import 'package:recipeasy/pages/user_recipe_details_page.dart';
 
 class MyRecipesPage extends StatefulWidget {
   @override
@@ -14,70 +18,32 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
   final SpoonacularService _spoonacularService = SpoonacularService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GlobalKey<_BookmarksPageState> _bookmarksPageKey = GlobalKey<_BookmarksPageState>();
+  List<Recipe> _userRecipes = [];
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: Size.fromHeight(kToolbarHeight),
-          child: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            bottom: TabBar(
-              indicatorColor: Color.fromARGB(255, 110, 59, 226),
-              tabs: [
-                Tab(text: 'Bookmarks'),
-                Tab(text: 'My Recipes'),
-              ],
-            ),
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            BookmarksPage(
-              key: _bookmarksPageKey,
-              folderService: _folderService,
-              spoonacularService: _spoonacularService,
-            ),
-            MyRecipesPageContent(),
-          ],
-        ),
-        floatingActionButton: Builder(
-          builder: (context) {
-            final tabController = DefaultTabController.of(context);
-            return AnimatedBuilder(
-              animation: tabController,
-              builder: (context, child) {
-                return FloatingActionButton(
-                  backgroundColor: Color.fromARGB(255, 110, 59, 226),
-                  onPressed: () async {
-                    if (tabController.index == 0) {
-                      await _showCreateFolderDialog(context);
-                    } else {
-                      // Action for my recipes
-                    }
-                  },
-                  child: IconTheme(
-                    data: IconThemeData(color: Colors.white),
-                    child: Icon(tabController.index == 0 ? Icons.create_new_folder : Icons.add),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _loadUserRecipes();
+  }
+
+  Future<void> _loadUserRecipes() async {
+    setState(() {
+      _userRecipes = [];
+    });
+    try {
+      final recipes = await _folderService.getUserRecipes();
+      setState(() {
+        _userRecipes = recipes;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load recipes: $e')));
+    }
   }
 
   Future<void> _showCreateFolderDialog(BuildContext context) async {
     final TextEditingController controller = TextEditingController();
     final formKey = GlobalKey<FormState>();
     String? errorMessage; // Track duplicate folder error
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -127,14 +93,12 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
                       final folders = await _folderService.getUserFolders();
                       final isDuplicate = folders.any((f) =>
                       f['name'].toLowerCase() == controller.text.toLowerCase());
-
                       if (isDuplicate) {
                         setState(() {
                           errorMessage = 'A folder with this name already exists';
                         });
                         return;
                       }
-
                       Navigator.pop(context);
                       await _folderService.createFolder(controller.text);
                       _bookmarksPageKey.currentState?._loadFolders();
@@ -147,6 +111,71 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
           },
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            bottom: TabBar(
+              indicatorColor: Color.fromARGB(255, 110, 59, 226),
+              tabs: [
+                Tab(text: 'Bookmarks'),
+                Tab(text: 'My Recipes'),
+              ],
+            ),
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            BookmarksPage(
+              key: _bookmarksPageKey,
+              folderService: _folderService,
+              spoonacularService: _spoonacularService,
+            ),
+            MyRecipesPageContent(
+              userRecipes: _userRecipes,
+              onRecipeDeleted: _loadUserRecipes,
+              onRecipeEdited: _loadUserRecipes,
+            ),
+          ],
+        ),
+        floatingActionButton: Builder(
+          builder: (context) {
+            final tabController = DefaultTabController.of(context);
+            return AnimatedBuilder(
+              animation: tabController,
+              builder: (context, child) {
+                return FloatingActionButton(
+                  backgroundColor: Color.fromARGB(255, 110, 59, 226),
+                  onPressed: () async {
+                    if (tabController.index == 0) {
+                      await _showCreateFolderDialog(context);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => CreateRecipePage()),
+                      ).then((_) => _loadUserRecipes());
+                    }
+                  },
+                  child: IconTheme(
+                    data: IconThemeData(color: Colors.white),
+                    child: Icon(tabController.index == 0 ? Icons.create_new_folder : Icons.add),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -208,46 +237,46 @@ class _BookmarksPageState extends State<BookmarksPage> {
       _recipes = [];
     });
     try {
-      Set<int> uniqueRecipeIds = {};
-      List<Map<String, dynamic>> recipes = [];
-      if (folderId == 'general') {
-        for (final folder in _folders) {
-          final recipeDocs = await widget.folderService.getRecipesInFolder(folder['id']);
-          for (final doc in recipeDocs) {
-            final recipeId = doc['recipeId'];
-            if (!uniqueRecipeIds.contains(recipeId)) {
-              uniqueRecipeIds.add(recipeId);
-              try {
-                final details = await widget.spoonacularService.getRecipeDetails(recipeId);
-                recipes.add({
-                  ...details,
-                  'docId': doc['id'],
-                  'folderId': folder['id'],
-                });
-              } catch (e) {
-                print('Error loading recipe $recipeId: $e');
-              }
+      List<Map<String, dynamic>> apiRecipes = [];
+      List<Map<String, dynamic>> userRecipes = [];
+      final recipeDocs = await widget.folderService.getRecipesInFolder(folderId);
+      for (final doc in recipeDocs) {
+        final recipeId = doc['recipeId'];
+        try {
+          Map<String, dynamic>? details;
+          if (recipeId is int) {
+            details = await widget.spoonacularService.getRecipeDetails(recipeId);
+            if (details != null) {
+              apiRecipes.add({
+                ...details,
+                'docId': doc['id'],
+                'folderId': folderId,
+              });
             }
+          } else if (recipeId is String) {
+            details = await widget.folderService.getUserRecipeDetails(recipeId);
+            if (details != null) {
+              userRecipes.add({
+                ...details,
+                'docId': doc['id'],
+                'folderId': folderId,
+              });
+            }
+          } else {
+            throw Exception('Invalid recipe ID type: $recipeId');
           }
-        }
-      } else {
-        final recipeDocs = await widget.folderService.getRecipesInFolder(folderId);
-        for (final doc in recipeDocs) {
-          try {
-            final details = await widget.spoonacularService.getRecipeDetails(doc['recipeId']);
-            recipes.add({
-              ...details,
-              'docId': doc['id'],
-              'folderId': folderId,
-            });
-          } catch (e) {
-            print('Error loading recipe ${doc['recipeId']}: $e');
-          }
+        } catch (e) {
+          print('Error loading recipe $recipeId: $e');
         }
       }
+      // Combine both lists
+      final combinedRecipes = [...apiRecipes, ...userRecipes];
       setState(() {
-        _recipes = recipes;
+        _recipes = combinedRecipes;
       });
+      if (combinedRecipes.isEmpty) {
+        print('No recipes found for folderId: $folderId');
+      }
     } catch (e) {
       print('Error loading recipes: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -267,11 +296,9 @@ class _BookmarksPageState extends State<BookmarksPage> {
       );
       return;
     }
-
     // Check if folder is empty
     final recipes = await widget.folderService.getRecipesInFolder(folderId);
     final bool isFolderEmpty = recipes.isEmpty;
-
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -292,9 +319,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
         ],
       ),
     ) ?? false;
-
     if (!shouldDelete) return;
-
     // Only show the additional prompt if folder has recipes
     bool deleteFromAll = false;
     if (!isFolderEmpty) {
@@ -316,18 +341,14 @@ class _BookmarksPageState extends State<BookmarksPage> {
         ),
       ) ?? false;
     }
-
     try {
       if (!isFolderEmpty && deleteFromAll) {
         await _removeRecipesFromAllFolders(folderId);
       }
-
       await widget.folderService.deleteFolder(folderId);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Folder deleted successfully')),
       );
-
       await _loadFolders();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -339,12 +360,10 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<void> _removeRecipesFromAllFolders(String folderId) async {
     final recipes = await widget.folderService.getRecipesInFolder(folderId);
     final recipeIds = recipes.map((r) => r['recipeId']).toSet();
-
     final allFolders = await widget.folderService.getUserFolders();
     if (!allFolders.any((f) => f['id'] == 'general')) {
       allFolders.add({'id': 'general', 'name': 'General'});
     }
-
     for (final folder in allFolders) {
       final folderRecipes = await widget.folderService.getRecipesInFolder(folder['id']);
       for (final recipe in folderRecipes) {
@@ -408,7 +427,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
     }
   }
 
-  Future<void> _removeRecipeFromAllFolders(int recipeId) async {
+  Future<void> _removeRecipeFromAllFolders(Object recipeId) async {
     try {
       for (final folder in _folders) {
         final recipes = await widget.folderService.getRecipesInFolder(folder['id']);
@@ -444,12 +463,10 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<void> _moveRecipeToFolders(Map<String, dynamic> recipe) async {
     final availableFolders = _folders.where((f) =>
     f['id'] != recipe['folderId'] && f['id'] != 'general').toList();
-
     final selectedFolders = <String, bool>{};
     for (final folder in availableFolders) {
       selectedFolders[folder['id']] = false;
     }
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -509,7 +526,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
         folderId: recipe['folderId'],
         recipeDocId: recipe['docId'],
       );
-
       for (final entry in selectedFolders.entries) {
         if (entry.value) {
           await widget.folderService.addRecipeToFolder(
@@ -518,7 +534,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
           );
         }
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Recipe moved successfully')),
       );
@@ -646,6 +661,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
               itemCount: _recipes.length,
               itemBuilder: (context, index) {
                 final recipe = _recipes[index];
+                final recipeId = recipe['recipeId'];
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                   child: ListTile(
@@ -684,14 +700,28 @@ class _BookmarksPageState extends State<BookmarksPage> {
                       },
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => RecipeDetailsPage(
-                            recipeId: recipe['id'],
+                      final recipeId = _recipes[index]['id']; // Changed from 'recipeId' to 'id'
+                      final isUserRecipe = recipeId is String;
+
+                      if (isUserRecipe) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserRecipeDetailsPage(
+                              recipeId: recipeId,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RecipeDetailsPage(
+                              recipeId: int.tryParse(recipeId.toString()) ?? 0,
+                            ),
+                          ),
+                        );
+                      }
                     },
                   ),
                 );
@@ -705,9 +735,20 @@ class _BookmarksPageState extends State<BookmarksPage> {
 }
 
 class MyRecipesPageContent extends StatelessWidget {
+  final List<Recipe> userRecipes;
+  final VoidCallback onRecipeDeleted;
+  final VoidCallback onRecipeEdited;
+  const MyRecipesPageContent({
+    required this.userRecipes,
+    required this.onRecipeDeleted,
+    required this.onRecipeEdited,
+    Key? key,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return userRecipes.isEmpty
+        ? Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -719,6 +760,76 @@ class MyRecipesPageContent extends StatelessWidget {
           ),
         ],
       ),
+    )
+        : ListView.builder(
+      itemCount: userRecipes.length,
+      itemBuilder: (context, index) {
+        final recipe = userRecipes[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          child: ListTile(
+            title: Text(
+              recipe.title,
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(recipe.description),
+            trailing: PopupMenuButton(
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  child: Text('Edit'),
+                  value: 'edit',
+                ),
+                PopupMenuItem(
+                  child: Text('Delete', style: TextStyle(color: Colors.red)),
+                  value: 'delete',
+                ),
+              ],
+              onSelected: (value) async {
+                if (value == 'edit') {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreateRecipePage(recipe: recipe),
+                    ),
+                  ).then((_) => onRecipeEdited());
+                } else if (value == 'delete') {
+                  final confirmDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Delete Recipe'),
+                      content: Text('Are you sure you want to delete this recipe?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: Text('Delete', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  ) ?? false;
+                  if (confirmDelete) {
+                    await RecipeFolderService().deleteUserRecipe(recipe.id);
+                    onRecipeDeleted();
+                  }
+                }
+              },
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserRecipeDetailsPage(
+                    recipeId: recipe.id,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

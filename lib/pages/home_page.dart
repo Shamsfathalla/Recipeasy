@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recipeasy/pages/recipe_details.dart';
-import 'package:recipeasy/pages/user_recipe_details_page.dart'; // Ensure this import is correct
+import 'package:recipeasy/pages/user_recipe_details_page.dart';
 import '/auth.dart';
 import '/pages/profile_page.dart';
 import '/pages/shoplist_page.dart';
@@ -15,7 +15,6 @@ import 'dart:math';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -32,6 +31,8 @@ class _HomePageState extends State<HomePage> {
   bool _isSearching = false;
   int _exploreRecipesLimit = 5;
   int _communityRecipesLimit = 5;
+  int _currentPage = 1;
+  bool _hasMoreRecipes = true;
 
   @override
   void initState() {
@@ -70,8 +71,8 @@ class _HomePageState extends State<HomePage> {
       await FirebaseFirestore.instance.collection('recipes').get();
       final List<dynamic> userRecipes = snapshot.docs.map((doc) {
         final data = doc.data();
-        data['id'] = doc.id; // Ensure each user recipe has an 'id' field
-        data['source'] = 'user'; // Add a source field to identify user-created recipes
+        data['id'] = doc.id;
+        data['source'] = 'user';
         return data;
       }).toList();
       userRecipes.shuffle(Random());
@@ -95,6 +96,8 @@ class _HomePageState extends State<HomePage> {
       _isSearching = false;
       _exploreRecipesLimit = 5;
       _communityRecipesLimit = 5;
+      _currentPage = 1;
+      _hasMoreRecipes = true;
       if (index == 0) {
         _fetchRandomRecipes();
         _fetchCommunityRecipes();
@@ -102,14 +105,17 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _searchRecipes(String query) async {
+  Future<void> _searchRecipes(String query, {int page = 1}) async {
     if (query.isEmpty) return;
     setState(() {
-      _isLoading = true;
+      if (page == 1) {
+        _isLoading = true;
+        _hasMoreRecipes = true;
+      }
       _isSearching = true;
     });
     try {
-      final apiRecipes = await _spoonacularService.searchRecipes(query);
+      final apiRecipes = await _spoonacularService.searchRecipes(query, page: page);
       final QuerySnapshot<Map<String, dynamic>> snapshot =
       await FirebaseFirestore.instance.collection('recipes')
           .where('title', isGreaterThanOrEqualTo: query)
@@ -121,8 +127,15 @@ class _HomePageState extends State<HomePage> {
         data['source'] = 'user';
         return data;
       }).toList();
+
       setState(() {
-        _recipes = [...apiRecipes, ...userRecipes];
+        if (page == 1) {
+          _recipes = [...apiRecipes, ...userRecipes];
+        } else {
+          _recipes.addAll([...apiRecipes, ...userRecipes]);
+        }
+        _currentPage = page;
+        _hasMoreRecipes = apiRecipes.isNotEmpty || userRecipes.isNotEmpty;
       });
     } catch (e) {
       print('Error: $e');
@@ -133,11 +146,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadMoreRecipes() async {
+    if (!_hasMoreRecipes) return;
+    await _searchRecipes(_searchController.text, page: _currentPage + 1);
+  }
+
   void _clearSearch() {
     setState(() {
       _searchController.clear();
       _recipes = [];
       _isSearching = false;
+      _currentPage = 1;
+      _hasMoreRecipes = true;
       _fetchRandomRecipes();
       _fetchCommunityRecipes();
     });
@@ -150,6 +170,8 @@ class _HomePageState extends State<HomePage> {
       _isSearching = false;
       _exploreRecipesLimit = 5;
       _communityRecipesLimit = 5;
+      _currentPage = 1;
+      _hasMoreRecipes = true;
       _fetchRandomRecipes();
       _fetchCommunityRecipes();
     });
@@ -173,6 +195,8 @@ class _HomePageState extends State<HomePage> {
         communityRecipesLimit: _communityRecipesLimit,
         setExploreRecipesLimit: (limit) => setState(() => _exploreRecipesLimit = limit),
         setCommunityRecipesLimit: (limit) => setState(() => _communityRecipesLimit = limit),
+        loadMoreRecipes: _loadMoreRecipes,
+        hasMoreRecipes: _hasMoreRecipes,
       ),
       MyRecipesPage(),
       ShopListPage(),
@@ -244,8 +268,8 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class HomeContent extends StatelessWidget {
-  final Function(String) searchRecipes;
+class HomeContent extends StatefulWidget {
+  final Function(String, {int page}) searchRecipes;
   final Function clearSearch;
   final Function fetchRandomRecipes;
   final Function fetchCommunityRecipes;
@@ -259,6 +283,8 @@ class HomeContent extends StatelessWidget {
   final int communityRecipesLimit;
   final Function(int) setExploreRecipesLimit;
   final Function(int) setCommunityRecipesLimit;
+  final Function loadMoreRecipes;
+  final bool hasMoreRecipes;
 
   const HomeContent({
     super.key,
@@ -276,7 +302,58 @@ class HomeContent extends StatelessWidget {
     required this.communityRecipesLimit,
     required this.setExploreRecipesLimit,
     required this.setCommunityRecipesLimit,
+    required this.loadMoreRecipes,
+    required this.hasMoreRecipes,
   });
+
+  @override
+  _HomeContentState createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent &&
+        widget.hasMoreRecipes &&
+        !_isLoadingMore &&
+        widget.isSearching) {
+      _loadMoreRecipes();
+    }
+  }
+
+  Future<void> _loadMoreRecipes() async {
+    if (!widget.hasMoreRecipes || _isLoadingMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    final currentPosition = _scrollController.position.pixels;
+
+    await widget.loadMoreRecipes();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.jumpTo(currentPosition);
+      setState(() {
+        _isLoadingMore = false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -288,32 +365,30 @@ class HomeContent extends StatelessWidget {
             children: [
               Expanded(
                 child: TextField(
-                  controller: searchController,
+                  controller: widget.searchController,
                   decoration: InputDecoration(
                     hintText: 'Search for recipes...',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10.0),
                     ),
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    suffixIcon: searchController.text.isEmpty
-                        ? null
-                        : IconButton(
+                    suffixIcon: IconButton(
                       icon: const Icon(Icons.clear),
                       onPressed: () {
-                        searchController.clear();
-                        clearSearch();
+                        widget.searchController.clear();
+                        widget.clearSearch();
                       },
                     ),
                   ),
                   onSubmitted: (query) {
-                    searchRecipes(query);
+                    widget.searchRecipes(query);
                   },
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          if (!isSearching)
+          if (!widget.isSearching)
             Expanded(
               child: ListView(
                 children: [
@@ -329,20 +404,20 @@ class HomeContent extends StatelessWidget {
                           const Spacer(),
                           IconButton(
                             icon: const Icon(Icons.refresh),
-                            onPressed: () => fetchRandomRecipes(),
+                            onPressed: () => widget.fetchRandomRecipes(),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (exploreRecipes.isNotEmpty)
+                      if (widget.exploreRecipes.isNotEmpty)
                         Column(
                           children: [
                             ListView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              itemCount: min(exploreRecipes.length, exploreRecipesLimit),
+                              itemCount: min(widget.exploreRecipes.length, widget.exploreRecipesLimit),
                               itemBuilder: (context, index) {
-                                final recipe = exploreRecipes[index];
+                                final recipe = widget.exploreRecipes[index];
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 4),
                                   child: ListTile(
@@ -383,12 +458,12 @@ class HomeContent extends StatelessWidget {
                                 );
                               },
                             ),
-                            if (exploreRecipes.length > 5)
+                            if (widget.exploreRecipes.length > 5)
                               TextButton(
                                 onPressed: () {
-                                  setExploreRecipesLimit(exploreRecipesLimit == 5 ? 10 : 5);
+                                  widget.setExploreRecipesLimit(widget.exploreRecipesLimit == 5 ? 10 : 5);
                                 },
-                                child: Text(exploreRecipesLimit == 5 ? 'Expand' : 'Contract'),
+                                child: Text(widget.exploreRecipesLimit == 5 ? 'Expand' : 'Contract'),
                               ),
                           ],
                         )
@@ -404,20 +479,20 @@ class HomeContent extends StatelessWidget {
                           const Spacer(),
                           IconButton(
                             icon: const Icon(Icons.refresh),
-                            onPressed: () => fetchCommunityRecipes(),
+                            onPressed: () => widget.fetchCommunityRecipes(),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (communityRecipes.isNotEmpty)
+                      if (widget.communityRecipes.isNotEmpty)
                         Column(
                           children: [
                             ListView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              itemCount: min(communityRecipes.length, communityRecipesLimit),
+                              itemCount: min(widget.communityRecipes.length, widget.communityRecipesLimit),
                               itemBuilder: (context, index) {
-                                final recipe = communityRecipes[index];
+                                final recipe = widget.communityRecipes[index];
                                 return Card(
                                   margin: const EdgeInsets.symmetric(vertical: 4),
                                   child: ListTile(
@@ -467,12 +542,12 @@ class HomeContent extends StatelessWidget {
                                 );
                               },
                             ),
-                            if (communityRecipes.length > 5)
+                            if (widget.communityRecipes.length > 5)
                               TextButton(
                                 onPressed: () {
-                                  setCommunityRecipesLimit(communityRecipesLimit == 5 ? 10 : 5);
+                                  widget.setCommunityRecipesLimit(widget.communityRecipesLimit == 5 ? 10 : 5);
                                 },
-                                child: Text(communityRecipesLimit == 5 ? 'Expand' : 'Contract'),
+                                child: Text(widget.communityRecipesLimit == 5 ? 'Expand' : 'Contract'),
                               ),
                           ],
                         )
@@ -483,18 +558,25 @@ class HomeContent extends StatelessWidget {
                 ],
               ),
             ),
-          if (isSearching)
+          if (widget.isSearching)
             Expanded(
-              child: isLoading
-                  ? const Center(
-                child: CircularProgressIndicator(),
-              )
-                  : (isSearching ? recipes : []).isEmpty
+              child: widget.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : widget.recipes.isEmpty
                   ? const Center(child: Text('No recipes found'))
                   : ListView.builder(
-                itemCount: recipes.length,
+                controller: _scrollController,
+                itemCount: widget.recipes.length + (widget.hasMoreRecipes ? 1 : 0),
                 itemBuilder: (context, index) {
-                  final recipe = recipes[index];
+                  if (index >= widget.recipes.length) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  final recipe = widget.recipes[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     child: ListTile(
@@ -507,16 +589,6 @@ class HomeContent extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(Icons.image_not_supported);
-                        },
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const SizedBox(
-                            width: 50,
-                            height: 50,
-                            child: Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
                         },
                       )
                           : const Icon(Icons.image_not_supported),

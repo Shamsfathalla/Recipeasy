@@ -74,8 +74,6 @@ class SettingsPage extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyLarge,
       ),
     ),
-    _buildSettingsOption(
-        context, Icons.notifications, 'Notification Settings', () {}),
     _buildThemeToggleOption(context),
   ]);
 

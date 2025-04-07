@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_profile_page.dart';
+import 'package:recipeasy/pages/user_recipe_details_page.dart';
+
+final RouteObserver<ModalRoute> routeObserver = RouteObserver<ModalRoute>();
 
 class ProfilePage extends StatefulWidget {
   final User user;
-
   const ProfilePage({Key? key, required this.user}) : super(key: key);
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<ProfilePage> with RouteAware {
   String? username;
   int followersCount = 0;
   int followingCount = 0;
@@ -24,12 +27,28 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _loadUserData();
+  }
+
   Future<void> _loadUserData() async {
     try {
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(widget.user.uid)
-          .get();
+      if (mounted) setState(() => isLoading = true);
+
+      final userDoc = await _firestore.collection('users').doc(widget.user.uid).get();
 
       if (!mounted) return;
 
@@ -42,18 +61,13 @@ class _ProfilePageState extends State<ProfilePage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      _showErrorSnackbar('Error loading profile: ${e.toString()}');
     }
   }
 
   Future<void> _addFriend(String friendId, String friendUsername) async {
     try {
       final currentUserId = widget.user.uid;
-
-      if (friendId == currentUserId) {
-        _showErrorSnackbar('You cannot follow yourself');
-        return;
-      }
+      if (friendId == currentUserId) return;
 
       final followingDoc = await _firestore
           .collection('users')
@@ -61,47 +75,32 @@ class _ProfilePageState extends State<ProfilePage> {
           .collection('following')
           .doc(friendId)
           .get();
-
-      if (followingDoc.exists) {
-        _showErrorSnackbar('You already follow $friendUsername');
-        return;
-      }
+      if (followingDoc.exists) return;
 
       final batch = _firestore.batch();
-
       batch.set(
         _firestore.collection('users').doc(currentUserId).collection('following').doc(friendId),
-        {
-          'username': friendUsername,
-          'timestamp': FieldValue.serverTimestamp(),
-        },
+        {'username': friendUsername, 'timestamp': FieldValue.serverTimestamp()},
       );
-
       batch.set(
         _firestore.collection('users').doc(friendId).collection('followers').doc(currentUserId),
-        {
-          'username': username,
-          'timestamp': FieldValue.serverTimestamp(),
-        },
+        {'username': username, 'timestamp': FieldValue.serverTimestamp()},
       );
-
       batch.update(
         _firestore.collection('users').doc(currentUserId),
         {'followingCount': FieldValue.increment(1)},
       );
-
       batch.update(
         _firestore.collection('users').doc(friendId),
         {'followersCount': FieldValue.increment(1)},
       );
 
       await batch.commit();
-
       if (!mounted) return;
-      setState(() => followingCount++);
-      _showSuccessSnackbar('You are now following $friendUsername');
+      await _loadUserData();
     } catch (e) {
-      _showErrorSnackbar('Error following user: ${e.toString()}');
+      if (!mounted) return;
+      _loadUserData();
     }
   }
 
@@ -109,32 +108,27 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final currentUserId = widget.user.uid;
       final batch = _firestore.batch();
-
       batch.delete(
         _firestore.collection('users').doc(currentUserId).collection('following').doc(userId),
       );
-
       batch.delete(
         _firestore.collection('users').doc(userId).collection('followers').doc(currentUserId),
       );
-
       batch.update(
         _firestore.collection('users').doc(currentUserId),
         {'followingCount': FieldValue.increment(-1)},
       );
-
       batch.update(
         _firestore.collection('users').doc(userId),
         {'followersCount': FieldValue.increment(-1)},
       );
 
       await batch.commit();
-
       if (!mounted) return;
-      setState(() => followingCount--);
-      _showSuccessSnackbar('You unfollowed $friendUsername');
+      await _loadUserData();
     } catch (e) {
-      _showErrorSnackbar('Error unfollowing user: ${e.toString()}');
+      if (!mounted) return;
+      _loadUserData();
     }
   }
 
@@ -142,32 +136,27 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final currentUserId = widget.user.uid;
       final batch = _firestore.batch();
-
       batch.delete(
         _firestore.collection('users').doc(currentUserId).collection('followers').doc(userId),
       );
-
       batch.delete(
         _firestore.collection('users').doc(userId).collection('following').doc(currentUserId),
       );
-
       batch.update(
         _firestore.collection('users').doc(currentUserId),
         {'followersCount': FieldValue.increment(-1)},
       );
-
       batch.update(
         _firestore.collection('users').doc(userId),
         {'followingCount': FieldValue.increment(-1)},
       );
 
       await batch.commit();
-
       if (!mounted) return;
-      setState(() => followersCount--);
-      _showSuccessSnackbar('Removed $followerUsername from followers');
+      await _loadUserData();
     } catch (e) {
-      _showErrorSnackbar('Error removing follower: ${e.toString()}');
+      if (!mounted) return;
+      _loadUserData();
     }
   }
 
@@ -179,9 +168,11 @@ class _ProfilePageState extends State<ProfilePage> {
           userId: widget.user.uid,
           type: 'following',
           onUnfollow: _unfollowUser,
+          onAddFriend: _addFriend,
+          currentUser: widget.user,
         ),
       ),
-    );
+    ).then((_) => _loadUserData());
   }
 
   void _showFollowersList() {
@@ -192,9 +183,10 @@ class _ProfilePageState extends State<ProfilePage> {
           userId: widget.user.uid,
           type: 'followers',
           onRemove: _removeFollower,
+          currentUser: widget.user,
         ),
       ),
-    );
+    ).then((_) => _loadUserData());
   }
 
   void _showAddFriendPage() {
@@ -205,37 +197,18 @@ class _ProfilePageState extends State<ProfilePage> {
           currentUserId: widget.user.uid,
           currentUsername: username ?? 'user',
           onAddFriend: _addFriend,
+          onUnfollow: _unfollowUser,
+          currentUser: widget.user,
         ),
       ),
-    );
-  }
-
-  void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-
-  void _showSuccessSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
-    );
+    ).then((_) => _loadUserData());
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: true,
         title: Text(
           'Profile',
           style: theme.textTheme.titleLarge?.copyWith(
@@ -244,10 +217,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
         centerTitle: true,
-        elevation: 0,
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-        ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -260,6 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -278,8 +248,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildProfileHeader(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
@@ -295,18 +263,16 @@ class _ProfilePageState extends State<ProfilePage> {
           const CircleAvatar(
             radius: 40,
             backgroundColor: Color.fromRGBO(110, 59, 226, 1),
-            child: Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.white,
-            ),
+            child: Icon(Icons.person, size: 50, color: Colors.white),
           ),
           const SizedBox(height: 16),
           Text(
             username ?? '@user',
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black,
+              color: theme.brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
             ),
           ),
         ],
@@ -343,10 +309,7 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
+            style: const TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ],
       ),
@@ -406,11 +369,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.group,
-                  size: 50,
-                  color: theme.disabledColor,
-                ),
+                Icon(Icons.group, size: 50, color: theme.disabledColor),
                 const SizedBox(height: 10),
                 Text(
                   'Your friends\' activity will appear here',
@@ -432,12 +391,16 @@ class _FriendsListScreen extends StatefulWidget {
   final String type;
   final Function(String, String)? onUnfollow;
   final Function(String, String)? onRemove;
+  final Function(String, String)? onAddFriend;
+  final User currentUser;
 
   const _FriendsListScreen({
     required this.userId,
     required this.type,
     this.onUnfollow,
     this.onRemove,
+    this.onAddFriend,
+    required this.currentUser,
   });
 
   @override
@@ -448,6 +411,75 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Map<String, bool> _followingStatus = {};
+  List<DocumentSnapshot> _cachedFollowingList = [];
+  bool _shouldRefreshOnResume = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowingStatus();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_shouldRefreshOnResume) {
+      _loadFollowingStatus();
+      _shouldRefreshOnResume = false;
+    }
+  }
+
+  Future<void> _loadFollowingStatus() async {
+    try {
+      final followingSnapshot = await _firestore
+          .collection('users')
+          .doc(widget.userId)
+          .collection('following')
+          .get();
+
+      final statusMap = <String, bool>{};
+      for (var doc in followingSnapshot.docs) {
+        statusMap[doc.id] = true;
+      }
+
+      setState(() {
+        _followingStatus = statusMap;
+        // Update cache when we're coming back from navigation
+        if (_shouldRefreshOnResume) {
+          _cachedFollowingList = followingSnapshot.docs;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading following status: $e');
+    }
+  }
+
+  Future<void> _toggleFollowStatus(String userId, String username) async {
+    try {
+      final isFollowing = _followingStatus[userId] ?? false;
+      setState(() {
+        _followingStatus[userId] = !isFollowing;
+      });
+
+      if (isFollowing) {
+        await widget.onUnfollow!(userId, username);
+      } else {
+        await widget.onAddFriend!(userId, username);
+      }
+    } catch (e) {
+      setState(() {
+        _followingStatus[userId] = !(_followingStatus[userId] ?? false);
+      });
+      debugPrint('Error toggling follow status: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -465,8 +497,8 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color.fromRGBO(161, 63, 190, 1), // RGB: 161 63 190
-                Color.fromRGBO(120, 60, 219, 1), // RGB: 120 60 219
+                Color.fromRGBO(161, 63, 190, 1),
+                Color.fromRGBO(120, 60, 219, 1),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -514,7 +546,6 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return Center(
                     child: Text(
@@ -524,7 +555,12 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                   );
                 }
 
-                final filteredDocs = snapshot.data!.docs.where((doc) {
+                // Update cache with fresh data from stream
+                if (!_shouldRefreshOnResume) {
+                  _cachedFollowingList = snapshot.data!.docs;
+                }
+
+                final filteredDocs = _cachedFollowingList.where((doc) {
                   final username = doc['username'].toString().toLowerCase();
                   return username.contains(_searchQuery.toLowerCase());
                 }).toList();
@@ -533,6 +569,7 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
                     final doc = filteredDocs[index];
+                    final isFollowing = _followingStatus[doc.id] ?? true;
                     return Card(
                       margin: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
@@ -549,13 +586,39 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                           doc['username'],
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserProfilePage(
+                                userId: doc.id,
+                                currentUser: widget.currentUser,
+                              ),
+                            ),
+                          ).then((_) {
+                            setState(() {
+                              _shouldRefreshOnResume = true;
+                            });
+                          });
+                        },
                         trailing: widget.type == 'following'
-                            ? IconButton(
-                          icon: const Icon(Icons.person_remove,
-                              color: Colors.red),
-                          onPressed: () {
-                            widget.onUnfollow?.call(doc.id, doc['username']);
-                          },
+                            ? ElevatedButton(
+                          onPressed: () => _toggleFollowStatus(
+                              doc.id, doc['username']),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isFollowing
+                                ? Colors.grey
+                                : const Color.fromRGBO(110, 59, 226, 1),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: Text(
+                            isFollowing ? 'Following' : 'Follow',
+                            style: const TextStyle(color: Colors.white),
+                          ),
                         )
                             : widget.onRemove != null
                             ? IconButton(
@@ -578,23 +641,21 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
 }
 
 class _AddFriendPage extends StatefulWidget {
   final String currentUserId;
   final String currentUsername;
   final Function(String, String) onAddFriend;
+  final Function(String, String) onUnfollow;
+  final User currentUser;
 
   const _AddFriendPage({
     required this.currentUserId,
     required this.currentUsername,
     required this.onAddFriend,
+    required this.onUnfollow,
+    required this.currentUser,
   });
 
   @override
@@ -607,6 +668,32 @@ class _AddFriendPageState extends State<_AddFriendPage> {
   bool _isSearching = false;
   String _errorMessage = '';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Map<String, bool> _followingStatus = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowingStatus();
+  }
+
+  Future<void> _loadFollowingStatus() async {
+    try {
+      final followingSnapshot = await _firestore
+          .collection('users')
+          .doc(widget.currentUserId)
+          .collection('following')
+          .get();
+      final statusMap = <String, bool>{};
+      for (var doc in followingSnapshot.docs) {
+        statusMap[doc.id] = true;
+      }
+      setState(() {
+        _followingStatus = statusMap;
+      });
+    } catch (e) {
+      debugPrint('Error loading following status: $e');
+    }
+  }
 
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
@@ -627,15 +714,14 @@ class _AddFriendPageState extends State<_AddFriendPage> {
           .where('username', isGreaterThanOrEqualTo: query)
           .where('username', isLessThanOrEqualTo: query + '\uf8ff')
           .get();
-      // Use a set to ensure unique users by ID
       final uniqueUserIds = <String>{};
       for (var doc in querySnapshot.docs) {
         if (doc.id != widget.currentUserId) {
           uniqueUserIds.add(doc.id);
         }
       }
-      // Fetch user details for unique IDs
-      final userDetails = await Future.wait(uniqueUserIds.map((id) => _firestore.collection('users').doc(id).get()));
+      final userDetails = await Future.wait(
+          uniqueUserIds.map((id) => _firestore.collection('users').doc(id).get()));
       setState(() {
         _searchResults = userDetails.map((doc) => {
           'id': doc.id,
@@ -652,6 +738,27 @@ class _AddFriendPageState extends State<_AddFriendPage> {
         _errorMessage = 'Error searching users: ${e.toString()}';
       });
       debugPrint('Error searching users: $e');
+    }
+  }
+
+  Future<void> _toggleFollowStatus(String userId, String username) async {
+    try {
+      final isFollowing = _followingStatus[userId] ?? false;
+      setState(() {
+        _followingStatus[userId] = !isFollowing;
+      });
+
+      if (isFollowing) {
+        await widget.onUnfollow(userId, username);
+      } else {
+        await widget.onAddFriend(userId, username);
+      }
+
+      await _loadFollowingStatus();
+    } catch (e) {
+      setState(() {
+        _followingStatus[userId] = !(_followingStatus[userId] ?? false);
+      });
     }
   }
 
@@ -729,18 +836,23 @@ class _AddFriendPageState extends State<_AddFriendPage> {
               itemCount: _searchResults.length,
               itemBuilder: (context, index) {
                 final user = _searchResults[index];
+                final isFollowing = _followingStatus[user['id']] ?? false;
                 return InkWell(
-                  onTap: () {
-                    // TODO: Implement profile viewing
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Viewing ${user['username']}\'s profile'),
-                        backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserProfilePage(
+                          userId: user['id'],
+                          currentUser: widget.currentUser,
+                        ),
                       ),
                     );
+                    await _loadFollowingStatus();
                   },
                   child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -764,14 +876,17 @@ class _AddFriendPageState extends State<_AddFriendPage> {
                             ),
                           ),
                           ElevatedButton(
-                            onPressed: () {
-                              widget.onAddFriend(user['id'], user['username']);
-                            },
+                            onPressed: () => _toggleFollowStatus(
+                                user['id'], user['username']),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
+                              backgroundColor: isFollowing
+                                  ? Colors.grey
+                                  : const Color.fromRGBO(110, 59, 226, 1),
                             ),
-                            child: const Text('Follow',
-                                style: TextStyle(color: Colors.white)),
+                            child: Text(
+                              isFollowing ? 'Following' : 'Follow',
+                              style: const TextStyle(color: Colors.white),
+                            ),
                           ),
                         ],
                       ),

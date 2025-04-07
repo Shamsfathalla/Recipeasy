@@ -59,6 +59,9 @@ class Auth {
         'username': username,
         'followersCount': 0,
         'followingCount': 0,
+        'recipesCreatedCount': 0,
+        'bookmarksAddedCount': 0,
+        'recipesVisitedCount': 0,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });

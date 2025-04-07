@@ -1,4 +1,3 @@
-// lib/pages/my_recipes_page.dart
 import 'package:flutter/material.dart';
 import 'package:recipeasy/models/recipe_model.dart';
 import 'package:recipeasy/services/recipe_folder_service.dart';
@@ -7,6 +6,7 @@ import 'package:recipeasy/pages/recipe_details.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'create_recipe_page.dart';
 import 'package:recipeasy/pages/user_recipe_details_page.dart';
+import 'package:recipeasy/services/analytics_service.dart';
 
 // Color constants
 final Color lightPurple = Color.fromARGB(255, 234, 221, 255); // Light purple shade
@@ -21,6 +21,7 @@ class MyRecipesPage extends StatefulWidget {
 class _MyRecipesPageState extends State<MyRecipesPage> {
   final RecipeFolderService _folderService = RecipeFolderService();
   final SpoonacularService _spoonacularService = SpoonacularService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GlobalKey<_BookmarksPageState> _bookmarksPageKey = GlobalKey<_BookmarksPageState>();
   List<Recipe> _userRecipes = [];
@@ -130,7 +131,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             bottom: TabBar(
-              indicatorColor: primaryPurple,
+              indicatorColor: Color.fromRGBO(110, 59, 226, 1),
               tabs: [
                 Tab(text: 'Bookmarks'),
                 Tab(text: 'My Recipes'),
@@ -159,7 +160,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
               animation: tabController,
               builder: (context, child) {
                 return FloatingActionButton(
-                  backgroundColor: isDarkMode ? primaryPurple : lightPurple,
+                  backgroundColor: isDarkMode ? Color.fromRGBO(110, 59, 226, 1) : Color.fromARGB(255, 234, 221, 255),
                   onPressed: () async {
                     if (tabController.index == 0) {
                       await _showCreateFolderDialog(context);
@@ -529,6 +530,15 @@ class _BookmarksPageState extends State<BookmarksPage> {
         folderId: recipe['folderId'],
         recipeDocId: recipe['docId'],
       );
+
+      // Always add to general folder when moving to other folders
+      if (!selectedFolders.containsKey('general')) {
+        await widget.folderService.addRecipeToFolder(
+          folderId: 'general',
+          recipeId: recipe['id'],
+        );
+      }
+
       for (final entry in selectedFolders.entries) {
         if (entry.value) {
           await widget.folderService.addRecipeToFolder(

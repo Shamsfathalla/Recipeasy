@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/spoonacular_api';
 import '../services/recipe_folder_service.dart';
+import '../services/analytics_service.dart'; // Added new import
 
 class RecipeDetailsPage extends StatefulWidget {
   final int recipeId;
@@ -20,6 +21,7 @@ class RecipeDetailsPage extends StatefulWidget {
 class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
   final SpoonacularService _spoonacularService = SpoonacularService();
   final RecipeFolderService _folderService = RecipeFolderService();
+  final AnalyticsService _analyticsService = AnalyticsService(); // Added analytics service
   Map<String, dynamic>? _recipeDetails;
   bool _isLoading = true;
   bool _hasError = false;
@@ -38,6 +40,16 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     super.initState();
     _fetchRecipeDetails();
     _loadFolders();
+    _trackRecipeView(); // Added analytics tracking
+  }
+
+  // Added new method for tracking recipe views
+  Future<void> _trackRecipeView() async {
+    try {
+      await _analyticsService.incrementRecipesVisited();
+    } catch (e) {
+      debugPrint('Error tracking recipe view: $e');
+    }
   }
 
   @override
@@ -206,14 +218,20 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
   }
 
   Future<void> _updateFolders() async {
+    final shouldBeInGeneral = _isGeneralSelected || _areOtherFoldersSelected;
     final isCurrentlyInGeneral = await _checkIfRecipeInFolder('general');
+
+    // Track whether we need to count analytics
+    bool shouldCountAnalytics = false;
+
     // Handle General folder
-    if (_isGeneralSelected && !isCurrentlyInGeneral) {
+    if (shouldBeInGeneral && !isCurrentlyInGeneral) {
       await _folderService.addRecipeToFolder(
         folderId: 'general',
         recipeId: widget.recipeId,
       );
-    } else if (!_isGeneralSelected && isCurrentlyInGeneral) {
+      shouldCountAnalytics = true;
+    } else if (!shouldBeInGeneral && isCurrentlyInGeneral) {
       final recipes = await _folderService.getRecipesInFolder('general');
       final recipeDoc = recipes.firstWhere(
             (recipe) => recipe['recipeId'] == widget.recipeId,
@@ -223,16 +241,27 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         recipeDocId: recipeDoc['id'],
       );
     }
+
     // Handle other folders
     for (final folder in _folders) {
       final folderId = folder['id'];
       final shouldBeInFolder = _isRecipeInFolder[folderId] ?? false;
       final isCurrentlyInFolder = await _checkIfRecipeInFolder(folderId);
+
       if (shouldBeInFolder && !isCurrentlyInFolder) {
         await _folderService.addRecipeToFolder(
           folderId: folderId,
           recipeId: widget.recipeId,
         );
+        shouldCountAnalytics = true;
+
+        // Ensure it's also in General folder when adding to any folder
+        if (!isCurrentlyInGeneral && !shouldBeInGeneral) {
+          await _folderService.addRecipeToFolder(
+            folderId: 'general',
+            recipeId: widget.recipeId,
+          );
+        }
       } else if (!shouldBeInFolder && isCurrentlyInFolder) {
         final recipes = await _folderService.getRecipesInFolder(folderId);
         final recipeDoc = recipes.firstWhere(
@@ -244,9 +273,15 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         );
       }
     }
-    // Update bookmark status
+
+    // Only count analytics once per bookmark operation
+    if (shouldCountAnalytics) {
+      await _analyticsService.incrementBookmarksAdded();
+    }
+
     setState(() {
-      _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((value) => value);
+      _isBookmarked = shouldBeInGeneral || _isRecipeInFolder.values.any((value) => value);
+      _isGeneralSelected = _isBookmarked;
     });
 
     if (mounted) {
@@ -369,7 +404,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please log in to add ingredients to your shopping list.'),
-              duration: Duration(seconds: 3),
+              duration: const Duration(seconds: 3),
             ),
           );
         }

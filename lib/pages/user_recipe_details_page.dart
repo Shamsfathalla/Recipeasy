@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:recipeasy/models/recipe_model.dart';
 import 'package:recipeasy/services/recipe_folder_service.dart';
+import 'package:recipeasy/services/analytics_service.dart'; // Added new import
 
 class UserRecipeDetailsPage extends StatefulWidget {
   final String recipeId;
@@ -20,6 +21,7 @@ class UserRecipeDetailsPage extends StatefulWidget {
 class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
   final RecipeFolderService _folderService = RecipeFolderService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AnalyticsService _analyticsService = AnalyticsService(); // Added analytics service
   Recipe? _recipeDetails;
   bool _isLoading = true;
   bool _hasError = false;
@@ -36,6 +38,16 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
     super.initState();
     _fetchRecipeDetails();
     _loadFolders();
+    _trackRecipeView(); // Added analytics tracking
+  }
+
+  // Added new method for tracking recipe views
+  Future<void> _trackRecipeView() async {
+    try {
+      await _analyticsService.incrementRecipesVisited();
+    } catch (e) {
+      debugPrint('Error tracking recipe view: $e');
+    }
   }
 
   @override
@@ -197,14 +209,20 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
   }
 
   Future<void> _updateFolders() async {
-    // Handle General folder
+    final shouldBeInGeneral = _isGeneralSelected || _isRecipeInFolder.values.any((v) => v);
     final isInGeneral = await _checkIfRecipeInFolder('general');
-    if (_isGeneralSelected && !isInGeneral) {
+
+    // Track whether we need to count analytics
+    bool shouldCountAnalytics = false;
+
+    // Handle General folder
+    if (shouldBeInGeneral && !isInGeneral) {
       await _folderService.addRecipeToFolder(
         folderId: 'general',
         recipeId: widget.recipeId,
       );
-    } else if (!_isGeneralSelected && isInGeneral) {
+      shouldCountAnalytics = true;
+    } else if (!shouldBeInGeneral && isInGeneral) {
       final recipes = await _folderService.getRecipesInFolder('general');
       final recipeDoc = recipes.firstWhere(
             (recipe) => recipe['recipeId'] == widget.recipeId,
@@ -226,6 +244,15 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
           folderId: folderId,
           recipeId: widget.recipeId,
         );
+        shouldCountAnalytics = true;
+
+        // Ensure it's also in General folder when adding to any folder
+        if (!isInGeneral && !shouldBeInGeneral) {
+          await _folderService.addRecipeToFolder(
+            folderId: 'general',
+            recipeId: widget.recipeId,
+          );
+        }
       } else if (!shouldBeInFolder && isInFolder) {
         final recipes = await _folderService.getRecipesInFolder(folderId);
         final recipeDoc = recipes.firstWhere(
@@ -238,8 +265,14 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
       }
     }
 
+    // Only count analytics once per bookmark operation
+    if (shouldCountAnalytics) {
+      await _analyticsService.incrementBookmarksAdded();
+    }
+
     setState(() {
-      _isBookmarked = _isGeneralSelected || _isRecipeInFolder.values.any((v) => v);
+      _isBookmarked = shouldBeInGeneral || _isRecipeInFolder.values.any((v) => v);
+      _isGeneralSelected = _isBookmarked;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(

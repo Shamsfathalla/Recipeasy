@@ -1,11 +1,11 @@
-// lib/pages/create_recipe_page.dart
 import 'package:flutter/material.dart';
 import 'package:recipeasy/models/recipe_model.dart';
 import 'package:recipeasy/services/recipe_folder_service.dart';
+import 'package:recipeasy/services/analytics_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class CreateRecipePage extends StatefulWidget {
-  final Recipe? recipe; // Pass a recipe if editing an existing one
+  final Recipe? recipe;
   const CreateRecipePage({super.key, this.recipe});
 
   @override
@@ -14,6 +14,7 @@ class CreateRecipePage extends StatefulWidget {
 
 class _CreateRecipePageState extends State<CreateRecipePage> {
   final RecipeFolderService _folderService = RecipeFolderService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
@@ -35,9 +36,6 @@ class _CreateRecipePageState extends State<CreateRecipePage> {
       widget.recipe!.instructions.forEach((instruction) {
         _instructionsControllers.add(TextEditingController(text: instruction));
       });
-    } else {
-      _ingredientsControllers.add(TextEditingController());
-      _instructionsControllers.add(TextEditingController());
     }
   }
 
@@ -74,7 +72,7 @@ class _CreateRecipePageState extends State<CreateRecipePage> {
     });
   }
 
-  void _saveRecipe() async {
+  Future<void> _saveRecipe() async {
     if (_formKey.currentState!.validate()) {
       try {
         final user = _auth.currentUser;
@@ -99,6 +97,7 @@ class _CreateRecipePageState extends State<CreateRecipePage> {
               const SnackBar(content: Text('Recipe updated successfully')));
         } else {
           await _folderService.createUserRecipe(recipe);
+          await _analyticsService.incrementRecipesCreated();
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Recipe created successfully')));
         }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_profile_page.dart';
 import 'package:recipeasy/pages/user_recipe_details_page.dart';
+import 'package:recipeasy/services/analytics_service.dart';
 
 final RouteObserver<ModalRoute> routeObserver = RouteObserver<ModalRoute>();
 
@@ -18,8 +19,12 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   String? username;
   int followersCount = 0;
   int followingCount = 0;
+  int recipesCreatedCount = 0;
+  int bookmarksAddedCount = 0;
+  int recipesVisitedCount = 0;
   bool isLoading = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final AnalyticsService _analyticsService = AnalyticsService();
 
   @override
   void initState() {
@@ -53,6 +58,9 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         username = userDoc.data()?['username'] ?? '@${widget.user.displayName ?? 'user'}';
         followersCount = userDoc.data()?['followersCount'] ?? 0;
         followingCount = userDoc.data()?['followingCount'] ?? 0;
+        recipesCreatedCount = userDoc.data()?['recipesCreatedCount'] ?? 0;
+        bookmarksAddedCount = userDoc.data()?['bookmarksAddedCount'] ?? 0;
+        recipesVisitedCount = userDoc.data()?['recipesVisitedCount'] ?? 0;
         isLoading = false;
       });
     } catch (e) {
@@ -196,48 +204,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     ).then((_) => _loadUserData());
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Profile',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color.fromRGBO(168, 64, 185, 1),
-                Color.fromRGBO(110, 59, 226, 1),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildProfileHeader(context),
-            _buildStatsRow(context),
-            _buildAddFriendButton(),
-            // Removed _buildRecentActivity(context),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileHeader(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
@@ -310,7 +276,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
 
   Widget _buildAddFriendButton() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: ElevatedButton.icon(
         icon: const Icon(Icons.person_add, color: Colors.white),
         label: const Text('Add Friend', style: TextStyle(color: Colors.white)),
@@ -323,6 +289,155 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
           padding: const EdgeInsets.symmetric(vertical: 15),
         ),
         onPressed: _showAddFriendPage,
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsSection(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.analytics,
+                    color: theme.brightness == Brightness.dark
+                        ? Color.fromARGB(255, 110, 59, 226)
+                        : theme.primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  'My Analytics',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildAnalyticItem(
+                  context,
+                  'Created',
+                  recipesCreatedCount,
+                  Icons.create_rounded,
+                ),
+                _buildAnalyticItem(
+                  context,
+                  'Bookmarked',
+                  bookmarksAddedCount,
+                  Icons.bookmark_rounded,
+                ),
+                _buildAnalyticItem(
+                  context,
+                  'Viewed',
+                  recipesVisitedCount,
+                  Icons.visibility_rounded,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnalyticItem(
+      BuildContext context, String label, int value, IconData icon) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Color.fromARGB(255, 110, 59, 226).withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: isDarkMode ? Color.fromARGB(255, 110, 59, 226) : theme.primaryColor,
+            size: 24,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value.toString(),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? Color.fromARGB(255, 110, 59, 226) : theme.primaryColor,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDarkMode ? Colors.white70 : Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Profile',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromRGBO(168, 64, 185, 1),
+                Color.fromRGBO(110, 59, 226, 1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildProfileHeader(context),
+            _buildStatsRow(context),
+            _buildAddFriendButton(),
+            _buildAnalyticsSection(context),
+          ],
+        ),
       ),
     );
   }
@@ -384,7 +499,6 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
       }
       setState(() {
         _followingStatus = statusMap;
-        // Update cache when we're coming back from navigation
         if (_shouldRefreshOnResume) {
           _cachedFollowingList = followingSnapshot.docs;
         }
@@ -492,7 +606,6 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                     ),
                   );
                 }
-                // Update cache with fresh data from stream
                 if (!_shouldRefreshOnResume) {
                   _cachedFollowingList = snapshot.data!.docs;
                 }

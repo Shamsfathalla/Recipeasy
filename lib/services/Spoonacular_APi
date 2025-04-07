@@ -6,7 +6,7 @@ import 'package:recipeasy/models/recipe.dart';
 import 'package:recipeasy/models/meal_model.dart';
 
 class SpoonacularService {
-  final String _apiKey = '4ec0a5012ea2487d87d999e1cacd916b'; // 8be11e6b2fdf466bbe400a81c87cfa65   867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b
+  final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65'; //4ec0a5012ea2487d87d999e1cacd916b 867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b
   final String _baseUrl = 'https://api.spoonacular.com';
 
     Future<List<dynamic>> searchRecipes(String query, {int page = 1}) async {

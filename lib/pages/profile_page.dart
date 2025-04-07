@@ -47,11 +47,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   Future<void> _loadUserData() async {
     try {
       if (mounted) setState(() => isLoading = true);
-
       final userDoc = await _firestore.collection('users').doc(widget.user.uid).get();
-
       if (!mounted) return;
-
       setState(() {
         username = userDoc.data()?['username'] ?? '@${widget.user.displayName ?? 'user'}';
         followersCount = userDoc.data()?['followersCount'] ?? 0;
@@ -68,7 +65,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     try {
       final currentUserId = widget.user.uid;
       if (friendId == currentUserId) return;
-
       final followingDoc = await _firestore
           .collection('users')
           .doc(currentUserId)
@@ -76,7 +72,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
           .doc(friendId)
           .get();
       if (followingDoc.exists) return;
-
       final batch = _firestore.batch();
       batch.set(
         _firestore.collection('users').doc(currentUserId).collection('following').doc(friendId),
@@ -94,7 +89,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         _firestore.collection('users').doc(friendId),
         {'followersCount': FieldValue.increment(1)},
       );
-
       await batch.commit();
       if (!mounted) return;
       await _loadUserData();
@@ -122,7 +116,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         _firestore.collection('users').doc(userId),
         {'followersCount': FieldValue.increment(-1)},
       );
-
       await batch.commit();
       if (!mounted) return;
       await _loadUserData();
@@ -148,9 +141,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       );
       batch.update(
         _firestore.collection('users').doc(userId),
-        {'followingCount': FieldValue.increment(-1)},
+        {'followersCount': FieldValue.increment(-1)},
       );
-
       await batch.commit();
       if (!mounted) return;
       await _loadUserData();
@@ -239,7 +231,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
             _buildProfileHeader(context),
             _buildStatsRow(context),
             _buildAddFriendButton(),
-            _buildRecentActivity(context),
+            // Removed _buildRecentActivity(context),
           ],
         ),
       ),
@@ -334,56 +326,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       ),
     );
   }
-
-  Widget _buildRecentActivity(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Text(
-              'Recent Activity',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 200,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.group, size: 50, color: theme.disabledColor),
-                const SizedBox(height: 10),
-                Text(
-                  'Your friends\' activity will appear here',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.disabledColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _FriendsListScreen extends StatefulWidget {
@@ -393,7 +335,6 @@ class _FriendsListScreen extends StatefulWidget {
   final Function(String, String)? onRemove;
   final Function(String, String)? onAddFriend;
   final User currentUser;
-
   const _FriendsListScreen({
     required this.userId,
     required this.type,
@@ -437,12 +378,10 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
           .doc(widget.userId)
           .collection('following')
           .get();
-
       final statusMap = <String, bool>{};
       for (var doc in followingSnapshot.docs) {
         statusMap[doc.id] = true;
       }
-
       setState(() {
         _followingStatus = statusMap;
         // Update cache when we're coming back from navigation
@@ -461,7 +400,6 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
       setState(() {
         _followingStatus[userId] = !isFollowing;
       });
-
       if (isFollowing) {
         await widget.onUnfollow!(userId, username);
       } else {
@@ -554,17 +492,14 @@ class _FriendsListScreenState extends State<_FriendsListScreen> {
                     ),
                   );
                 }
-
                 // Update cache with fresh data from stream
                 if (!_shouldRefreshOnResume) {
                   _cachedFollowingList = snapshot.data!.docs;
                 }
-
                 final filteredDocs = _cachedFollowingList.where((doc) {
                   final username = doc['username'].toString().toLowerCase();
                   return username.contains(_searchQuery.toLowerCase());
                 }).toList();
-
                 return ListView.builder(
                   itemCount: filteredDocs.length,
                   itemBuilder: (context, index) {
@@ -649,7 +584,6 @@ class _AddFriendPage extends StatefulWidget {
   final Function(String, String) onAddFriend;
   final Function(String, String) onUnfollow;
   final User currentUser;
-
   const _AddFriendPage({
     required this.currentUserId,
     required this.currentUsername,
@@ -747,13 +681,11 @@ class _AddFriendPageState extends State<_AddFriendPage> {
       setState(() {
         _followingStatus[userId] = !isFollowing;
       });
-
       if (isFollowing) {
         await widget.onUnfollow(userId, username);
       } else {
         await widget.onAddFriend(userId, username);
       }
-
       await _loadFollowingStatus();
     } catch (e) {
       setState(() {

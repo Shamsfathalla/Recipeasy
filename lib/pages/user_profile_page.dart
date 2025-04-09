@@ -397,6 +397,7 @@ class _FollowListPageState extends State<FollowListPage> {
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> filteredUsers = [];
   bool isLoading = true;
+  String? processingUserId;
 
   @override
   void initState() {
@@ -484,6 +485,8 @@ class _FollowListPageState extends State<FollowListPage> {
     }
 
     try {
+      setState(() => processingUserId = targetUserId);
+
       final isFollowing = users.firstWhere((u) => u['id'] == targetUserId)['isFollowing'];
       final batch = _firestore.batch();
 
@@ -535,10 +538,17 @@ class _FollowListPageState extends State<FollowListPage> {
             users[userIndex]['isFollowing'] = !isFollowing;
           }
           _filterUsers();
+          processingUserId = null;
         });
       }
     } catch (e) {
+      if (mounted) {
+        setState(() => processingUserId = null);
+      }
       debugPrint('Error toggling follow status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
@@ -613,33 +623,64 @@ class _FollowListPageState extends State<FollowListPage> {
               itemCount: filteredUsers.length,
               itemBuilder: (context, index) {
                 final user = filteredUsers[index];
-                return ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color.fromRGBO(120, 60, 219, 1),
-                    child: Icon(Icons.person, color: Colors.white),
+                final isCurrentUser = user['id'] == widget.currentUser.uid;
+                final isProcessing = user['id'] == processingUserId;
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  title: Text(
-                    user['username'],
-                    style: TextStyle(
-                      fontWeight: user['id'] == widget.currentUser.uid
-                          ? FontWeight.bold
-                          : FontWeight.w500,
-                      color: user['id'] == widget.currentUser.uid
-                          ? isDarkMode ? Colors.white : Colors.black
-                          : Theme.of(context).textTheme.bodyLarge?.color,
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Color.fromRGBO(120, 60, 219, 1),
+                      child: Icon(Icons.person, color: Colors.white),
                     ),
+                    title: Text(
+                      user['username'],
+                      style: TextStyle(
+                        fontWeight: isCurrentUser
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        color: isCurrentUser
+                            ? isDarkMode ? Colors.white : Colors.black
+                            : Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    trailing: !isCurrentUser
+                        ? SizedBox(
+                      width: 100,
+                      height: 36,
+                      child: isProcessing
+                          ? const Center(child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ))
+                          : ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: user['isFollowing']
+                              ? Colors.grey[300]
+                              : const Color.fromRGBO(120, 60, 219, 1),
+                          foregroundColor: user['isFollowing']
+                              ? Colors.black
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        onPressed: () => _toggleFollowStatus(user['id'], user['username']),
+                        child: Text(
+                          user['isFollowing'] ? 'Unfollow' : 'Follow',
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    )
+                        : null,
+                    onTap: isCurrentUser ? null : () => _viewUserProfile(user['id']),
                   ),
-                  trailing: widget.currentUser.uid != user['id']
-                      ? IconButton(
-                    icon: Icon(
-                      user['isFollowing'] ? Icons.person_remove : Icons.person_add,
-                      color: const Color.fromRGBO(120, 60, 219, 1),
-                    ),
-                    onPressed: () => _toggleFollowStatus(user['id'], user['username']),
-                  )
-                      : null,
-                  onTap: () => _viewUserProfile(user['id']),
-                  enabled: widget.currentUser.uid != user['id'],
                 );
               },
             ),

@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import '/theme_provider.dart';
 import '../pages/login_register_page.dart';
 import '/services/firestore_services.dart';
+import '../pages/privacy_policy_page.dart';
+import '../pages/terms_of_service_page.dart';
+import '../pages/help_faq_page.dart';
 
 class SettingsPage extends StatelessWidget {
   final User? user;
@@ -85,10 +88,39 @@ class SettingsPage extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyLarge,
       ),
     ),
-    _buildSettingsOption(context, Icons.help_center, 'Help & FAQ', () {}),
     _buildSettingsOption(
-        context, Icons.description, 'Terms of Service', () {}),
-    _buildSettingsOption(context, Icons.security, 'Privacy Policy', () {}),
+        context,
+        Icons.help_center,
+        'Help & FAQ',
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HelpFAQPage()),
+          );
+        }
+    ),
+    _buildSettingsOption(
+        context,
+        Icons.description,
+        'Terms of Service',
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const TermsOfServicePage()),
+          );
+        }
+    ),
+    _buildSettingsOption(
+        context,
+        Icons.security,
+        'Privacy Policy',
+            () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PrivacyPolicyPage()),
+          );
+        }
+    ),
   ]);
 
   Widget _buildSignOutButton(BuildContext context) => Padding(

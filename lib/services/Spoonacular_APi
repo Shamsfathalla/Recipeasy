@@ -8,19 +8,41 @@ import 'package:recipeasy/models/meal_model.dart';
 class SpoonacularService {
   final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65'; //4ec0a5012ea2487d87d999e1cacd916b 867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b
   final String _baseUrl = 'https://api.spoonacular.com';
+  Future<List<dynamic>> searchRecipes(String query, {int page = 1, List<String>? dietaryRequirements, List<String>? allergies, int? maxCookingTime}) async {
+    String dietQuery = '';
+    String allergyQuery = '';
+    String cookingTimeQuery = '';
 
-    Future<List<dynamic>> searchRecipes(String query, {int page = 1}) async {
-      final url = Uri.parse(
-          '$_baseUrl/recipes/complexSearch?query=$query&apiKey=$_apiKey&offset=${(page - 1) * 10}&number=10');
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['results'];
-      } else {
-        throw Exception('Failed to fetch recipes: ${response.statusCode}');
-      }
+    // Add dietary requirements to the query
+    if (dietaryRequirements != null && dietaryRequirements.isNotEmpty) {
+      dietQuery = '&diet=${dietaryRequirements.join(',')}';
     }
+
+    // Add allergies (intolerances) to the query
+    if (allergies != null && allergies.isNotEmpty) {
+      allergyQuery = '&intolerances=${allergies.join(',')}';
+    }
+
+    // Add cooking time to the query
+    if (maxCookingTime != null) {
+      cookingTimeQuery = '&maxReadyTime=$maxCookingTime';
+    }
+
+    // Include all filters in the final URL
+    final url = Uri.parse(
+        '$_baseUrl/recipes/complexSearch?query=$query$dietQuery$allergyQuery$cookingTimeQuery&apiKey=$_apiKey&offset=${(page - 1) * 10}&number=10');
+    
+    print('API URL: $url'); // Debugging: Print the API URL to verify the query
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['results'];
+    } else {
+      throw Exception('Failed to fetch recipes: ${response.statusCode}');
+    }
+  }
 
     Future<Map<String, dynamic>> getRecipeDetails(int recipeId) async {
       final url = Uri.parse('$_baseUrl/recipes/$recipeId/information?apiKey=$_apiKey');

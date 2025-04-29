@@ -23,6 +23,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   int bookmarksAddedCount = 0;
   int recipesVisitedCount = 0;
   bool isLoading = true;
+  List<String> dietaryRequirements = [];
+  List<String> allergies = [];
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AnalyticsService _analyticsService = AnalyticsService();
 
@@ -61,6 +63,8 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         recipesCreatedCount = userDoc.data()?['recipesCreatedCount'] ?? 0;
         bookmarksAddedCount = userDoc.data()?['bookmarksAddedCount'] ?? 0;
         recipesVisitedCount = userDoc.data()?['recipesVisitedCount'] ?? 0;
+        dietaryRequirements = List<String>.from(userDoc.data()?['dietaryRequirements'] ?? []);
+        allergies = List<String>.from(userDoc.data()?['allergies'] ?? []);
         isLoading = false;
       });
     } catch (e) {
@@ -174,7 +178,108 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
       ),
     ).then((_) => _loadUserData());
   }
-
+  void _showAddDietaryRequirementDialog() {
+    final TextEditingController _dietController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add Dietary Requirement'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter a dietary requirement:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _dietController,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., Vegetarian, Vegan, Gluten-Free',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final requirement = _dietController.text.trim();
+                if (requirement.isNotEmpty) {
+                  await _firestore.collection('users').doc(widget.user.uid).update({
+                    'dietaryRequirements': FieldValue.arrayUnion([requirement]),
+                  });
+                  Navigator.pop(context);
+                  _loadUserData(); // Refresh user data
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  void _showAddAllergyDialog() {
+    final TextEditingController _allergyController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add Allergy'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter an allergy:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _allergyController,
+                decoration: const InputDecoration(
+                  hintText: 'e.g., Peanuts, Shellfish, Dairy',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final allergy = _allergyController.text.trim();
+                if (allergy.isNotEmpty) {
+                  await _firestore.collection('users').doc(widget.user.uid).update({
+                    'allergies': FieldValue.arrayUnion([allergy]),
+                  });
+                  Navigator.pop(context);
+                  _loadUserData(); // Refresh user data
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
   void _showFollowersList() {
     Navigator.push(
       context,
@@ -251,6 +356,147 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
     );
   }
 
+Widget _buildDietaryAndAllergiesSection() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+    child: Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        title: const Text(
+          'Dietary Preferences',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        children: [
+          // Dietary Requirements Section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'Dietary Requirements',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                if (dietaryRequirements.isEmpty)
+                  const Text(
+                    'No dietary requirements added.',
+                    style: TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  )
+                else
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: dietaryRequirements
+                        .map((requirement) => Chip(
+                              label: Text(requirement),
+                              deleteIcon: const Icon(Icons.close, size: 18),
+                              onDeleted: () async {
+                                await _firestore
+                                    .collection('users')
+                                    .doc(widget.user.uid)
+                                    .update({
+                                  'dietaryRequirements':
+                                      FieldValue.arrayRemove([requirement]),
+                                });
+                                _loadUserData(); 
+                              },
+                            ))
+                        .toList(),
+                  ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: _showAddDietaryRequirementDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text(
+                    'Add Dietary Requirement',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          // Allergies Section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'Allergies',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                if (allergies.isEmpty)
+                  const Text(
+                    'No allergies added.',
+                    style: TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  )
+                else
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: allergies
+                        .map((allergy) => Chip(
+                              label: Text(allergy),
+                              deleteIcon: const Icon(Icons.close, size: 18),
+                              onDeleted: () async {
+                                await _firestore
+                                    .collection('users')
+                                    .doc(widget.user.uid)
+                                    .update({
+                                  'allergies': FieldValue.arrayRemove([allergy]),
+                                });
+                                _loadUserData(); // Refresh user data
+                              },
+                            ))
+                        .toList(),
+                  ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: _showAddAllergyDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Allergy'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromRGBO(110, 59, 226, 1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   Widget _buildStatItem(String value, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -434,6 +680,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
           children: [
             _buildProfileHeader(context),
             _buildStatsRow(context),
+            _buildDietaryAndAllergiesSection(),
             _buildAddFriendButton(),
             _buildAnalyticsSection(context),
           ],

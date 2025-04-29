@@ -33,10 +33,14 @@ class _HomePageState extends State<HomePage> {
   int _communityRecipesLimit = 5;
   int _currentPage = 1;
   bool _hasMoreRecipes = true;
+  List<String> _userDietaryRequirements = [];
+  List<String> _userAllergies = [];
+  bool _includeFilters = false; // Toggle for including filters
 
   @override
   void initState() {
     super.initState();
+    _fetchUserPreferences(); 
     _fetchRandomRecipes();
     _fetchCommunityRecipes();
   }
@@ -105,7 +109,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _searchRecipes(String query, {int page = 1}) async {
+  Future<void> _searchRecipes(String query, {int page = 1, int? maxCookingTime}) async {
     if (query.isEmpty) return;
     setState(() {
       if (page == 1) {
@@ -115,12 +119,20 @@ class _HomePageState extends State<HomePage> {
       _isSearching = true;
     });
     try {
-      final apiRecipes = await _spoonacularService.searchRecipes(query, page: page);
+      final apiRecipes = await _spoonacularService.searchRecipes(
+        query,
+        page: page,
+        dietaryRequirements: _includeFilters ? _userDietaryRequirements : null,
+        allergies: _includeFilters ? _userAllergies : null,
+        maxCookingTime: maxCookingTime, // Pass maxCookingTime to the Spoonacular API
+      );
+
       final QuerySnapshot<Map<String, dynamic>> snapshot =
-      await FirebaseFirestore.instance.collection('recipes')
-          .where('title', isGreaterThanOrEqualTo: query)
-          .where('title', isLessThanOrEqualTo: query + '\uf8ff')
-          .get();
+          await FirebaseFirestore.instance.collection('recipes')
+              .where('title', isGreaterThanOrEqualTo: query)
+              .where('title', isLessThanOrEqualTo: query + '\uf8ff')
+              .get();
+
       final List<dynamic> userRecipes = snapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
@@ -145,6 +157,24 @@ class _HomePageState extends State<HomePage> {
       });
     }
   }
+  Future<void> _fetchUserPreferences() async {
+  try {
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(FirebaseAuth.instance.currentUser?.uid)
+        .get();
+
+    if (userDoc.exists) {
+      setState(() {
+        _userDietaryRequirements =
+            List<String>.from(userDoc.data()?['dietaryRequirements'] ?? []);
+        _userAllergies = List<String>.from(userDoc.data()?['allergies'] ?? []);
+      });
+    }
+  } catch (e) {
+    print('Error fetching user preferences: $e');
+  }
+}
 
   Future<void> _loadMoreRecipes() async {
     if (!_hasMoreRecipes) return;
@@ -187,6 +217,8 @@ class _HomePageState extends State<HomePage> {
         isLoading: _isLoading,
         searchController: _searchController,
         exploreRecipes: _exploreRecipes,
+        includeFilters: _includeFilters,
+        setIncludeFilters: (value) => setState(() => _includeFilters = value),
         communityRecipes: _communityRecipes,
         fetchRandomRecipes: _fetchRandomRecipes,
         fetchCommunityRecipes: _fetchCommunityRecipes,
@@ -268,7 +300,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class HomeContent extends StatefulWidget {
-  final Function(String, {int page}) searchRecipes;
+  final Function(String, {int page, int? maxCookingTime}) searchRecipes; // Add maxCookingTime here
   final Function clearSearch;
   final Function fetchRandomRecipes;
   final Function fetchCommunityRecipes;
@@ -284,6 +316,8 @@ class HomeContent extends StatefulWidget {
   final Function(int) setCommunityRecipesLimit;
   final Function loadMoreRecipes;
   final bool hasMoreRecipes;
+  final bool includeFilters;
+  final Function(bool) setIncludeFilters;
 
   const HomeContent({
     super.key,
@@ -303,6 +337,8 @@ class HomeContent extends StatefulWidget {
     required this.setCommunityRecipesLimit,
     required this.loadMoreRecipes,
     required this.hasMoreRecipes,
+    required this.includeFilters,
+    required this.setIncludeFilters,
   });
 
   @override
@@ -314,6 +350,8 @@ class _HomeContentState extends State<HomeContent> {
   bool _isLoadingMore = false;
   bool _isRefreshingExplore = false;
   bool _isRefreshingCommunity = false;
+
+  int _maxCookingTime = 60; // Default max cooking time in minutes
 
   @override
   void initState() {
@@ -367,39 +405,78 @@ class _HomeContentState extends State<HomeContent> {
     await widget.fetchCommunityRecipes();
     setState(() => _isRefreshingCommunity = false);
   }
-
+Widget _buildSearchBar() {
+  return Column(
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: widget.searchController,
+              decoration: InputDecoration(
+                hintText: 'Search for recipes...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    widget.searchController.clear();
+                    widget.clearSearch();
+                  },
+                ),
+              ),
+              onSubmitted: (query) {
+                widget.searchRecipes(query, maxCookingTime: _maxCookingTime);
+              },
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text('Include Filters:'),
+          Switch(
+            value: widget.includeFilters,
+            onChanged: (value) {
+              widget.setIncludeFilters(value);
+            },
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          const Text('Max Cooking Time:'),
+          Expanded(
+            child: Slider(
+              value: _maxCookingTime.toDouble(),
+              min: 10,
+              max: 120,
+              divisions: 11,
+              label: '$_maxCookingTime min',
+              onChanged: (value) {
+                setState(() {
+                  _maxCookingTime = value.toInt();
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: widget.searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search for recipes...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        widget.searchController.clear();
-                        widget.clearSearch();
-                      },
-                    ),
-                  ),
-                  onSubmitted: (query) {
-                    widget.searchRecipes(query);
-                  },
-                ),
-              ),
-            ],
-          ),
+          _buildSearchBar(), // Use the reusable search bar method
           const SizedBox(height: 16),
           if (!widget.isSearching)
             Expanded(
@@ -417,14 +494,14 @@ class _HomeContentState extends State<HomeContent> {
                           const Spacer(),
                           _isRefreshingExplore
                               ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
                               : IconButton(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: _refreshExploreRecipes,
-                          ),
+                                  icon: const Icon(Icons.refresh),
+                                  onPressed: _refreshExploreRecipes,
+                                ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -455,30 +532,29 @@ class _HomeContentState extends State<HomeContent> {
                                       padding: const EdgeInsets.all(12.0),
                                       child: Row(
                                         children: [
-                                          recipe['image'] != null &&
-                                              recipe['image'].isNotEmpty
+                                          recipe['image'] != null && recipe['image'].isNotEmpty
                                               ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8.0),
-                                            child: Image.network(
-                                              recipe['image'],
-                                              width: 50,
-                                              height: 50,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(Icons.image_not_supported);
-                                              },
-                                              loadingBuilder: (context, child, loadingProgress) {
-                                                if (loadingProgress == null) return child;
-                                                return const SizedBox(
-                                                  width: 50,
-                                                  height: 50,
-                                                  child: Center(
-                                                    child: CircularProgressIndicator(),
+                                                  borderRadius: BorderRadius.circular(8.0),
+                                                  child: Image.network(
+                                                    recipe['image'],
+                                                    width: 50,
+                                                    height: 50,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Icon(Icons.image_not_supported);
+                                                    },
+                                                    loadingBuilder: (context, child, loadingProgress) {
+                                                      if (loadingProgress == null) return child;
+                                                      return const SizedBox(
+                                                        width: 50,
+                                                        height: 50,
+                                                        child: Center(
+                                                          child: CircularProgressIndicator(),
+                                                        ),
+                                                      );
+                                                    },
                                                   ),
-                                                );
-                                              },
-                                            ),
-                                          )
+                                                )
                                               : const Icon(Icons.image_not_supported),
                                           const SizedBox(width: 12),
                                           Expanded(
@@ -515,14 +591,14 @@ class _HomeContentState extends State<HomeContent> {
                           const Spacer(),
                           _isRefreshingCommunity
                               ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
                               : IconButton(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: _refreshCommunityRecipes,
-                          ),
+                                  icon: const Icon(Icons.refresh),
+                                  onPressed: _refreshCommunityRecipes,
+                                ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -562,30 +638,29 @@ class _HomeContentState extends State<HomeContent> {
                                       padding: const EdgeInsets.all(12.0),
                                       child: Row(
                                         children: [
-                                          recipe['image'] != null &&
-                                              recipe['image'].isNotEmpty
+                                          recipe['image'] != null && recipe['image'].isNotEmpty
                                               ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8.0),
-                                            child: Image.network(
-                                              recipe['image'],
-                                              width: 50,
-                                              height: 50,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(Icons.image_not_supported);
-                                              },
-                                              loadingBuilder: (context, child, loadingProgress) {
-                                                if (loadingProgress == null) return child;
-                                                return const SizedBox(
-                                                  width: 50,
-                                                  height: 50,
-                                                  child: Center(
-                                                    child: CircularProgressIndicator(),
+                                                  borderRadius: BorderRadius.circular(8.0),
+                                                  child: Image.network(
+                                                    recipe['image'],
+                                                    width: 50,
+                                                    height: 50,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Icon(Icons.image_not_supported);
+                                                    },
+                                                    loadingBuilder: (context, child, loadingProgress) {
+                                                      if (loadingProgress == null) return child;
+                                                      return const SizedBox(
+                                                        width: 50,
+                                                        height: 50,
+                                                        child: Center(
+                                                          child: CircularProgressIndicator(),
+                                                        ),
+                                                      );
+                                                    },
                                                   ),
-                                                );
-                                              },
-                                            ),
-                                          )
+                                                )
                                               : const Icon(Icons.image_not_supported),
                                           const SizedBox(width: 12),
                                           Expanded(
@@ -617,84 +692,83 @@ class _HomeContentState extends State<HomeContent> {
                 ],
               ),
             ),
-          if (widget.isSearching)
-            Expanded(
-              child: widget.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : widget.recipes.isEmpty
-                  ? const Center(child: Text('No recipes found'))
-                  : ListView.builder(
-                controller: _scrollController,
-                itemCount: widget.recipes.length + (widget.hasMoreRecipes ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= widget.recipes.length) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  }
-                  final recipe = widget.recipes[index];
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(4),
-                      onTap: () {
-                        if (recipe['id'] != null) {
-                          if (recipe['source'] == 'user') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => UserRecipeDetailsPage(recipeId: recipe['id']),
-                              ),
-                            );
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => RecipeDetailsPage(recipeId: recipe['id']),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          children: [
-                            recipe['image'] != null &&
-                                recipe['image'].isNotEmpty
-                                ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8.0),
-                              child: Image.network(
-                                recipe['image'],
-                                width: 50,
-                                height: 50,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.image_not_supported);
-                                },
-                              ),
-                            )
-                                : const Icon(Icons.image_not_supported),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                recipe['title'] ?? 'Untitled Recipe',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+            if (widget.isSearching)
+              Expanded(
+                child: widget.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : widget.recipes.isEmpty
+                        ? const Center(child: Text('No recipes found'))
+                        : ListView.builder(
+                            controller: _scrollController,
+                            itemCount: widget.recipes.length + (widget.hasMoreRecipes ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index >= widget.recipes.length) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                              final recipe = widget.recipes[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(4),
+                                  onTap: () {
+                                    if (recipe['id'] != null) {
+                                      if (recipe['source'] == 'user') {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => UserRecipeDetailsPage(recipeId: recipe['id']),
+                                          ),
+                                        );
+                                      } else {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => RecipeDetailsPage(recipeId: recipe['id']),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Row(
+                                      children: [
+                                        recipe['image'] != null && recipe['image'].isNotEmpty
+                                            ? ClipRRect(
+                                                borderRadius: BorderRadius.circular(8.0),
+                                                child: Image.network(
+                                                  recipe['image'],
+                                                  width: 50,
+                                                  height: 50,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return const Icon(Icons.image_not_supported);
+                                                  },
+                                                ),
+                                              )
+                                            : const Icon(Icons.image_not_supported),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            recipe['title'] ?? 'Untitled Recipe',
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
               ),
-            ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
   }
-}

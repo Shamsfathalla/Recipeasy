@@ -298,7 +298,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<void> _deleteFolder(String folderId) async {
     if (folderId == 'general') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot delete the General folder')),
+        SnackBar(content: Text('Cannot delete the All Bookmarks folder')),
       );
       return;
     }
@@ -331,7 +331,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text('Delete Recipes'),
-          content: Text('Do you want to delete these recipes from ALL folders including General?'),
+          content: Text('Do you want to delete these recipes from ALL folders including All Bookmarks?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -574,7 +574,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: FilterChip(
-                      label: Text('General'),
+                      label: Text('All Bookmarks'),
                       selected: _selectedFolderId == 'general',
                       onSelected: (selected) {
                         if (selected) {

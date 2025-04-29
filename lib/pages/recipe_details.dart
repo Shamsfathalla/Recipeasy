@@ -167,7 +167,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                     ),
                     const Divider(),
                     CheckboxListTile(
-                      title: const Text('General'),
+                      title: const Text('All Bookmarks'),
                       value: _isGeneralSelected || _areOtherFoldersSelected,
                       onChanged: (value) {
                         if (_areOtherFoldersSelected && value == false) {

@@ -166,7 +166,7 @@ class _UserRecipeDetailsPageState extends State<UserRecipeDetailsPage> {
                     ),
                     const Divider(),
                     CheckboxListTile(
-                      title: const Text('General'),
+                      title: const Text('All Bookmarks'),
                       value: _isGeneralSelected || _isRecipeInFolder.values.any((v) => v),
                       onChanged: (value) {
                         if (_isRecipeInFolder.values.any((v) => v) && value == false) return;

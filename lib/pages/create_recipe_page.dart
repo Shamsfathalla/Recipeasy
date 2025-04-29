@@ -114,7 +114,26 @@ class _CreateRecipePageState extends State<CreateRecipePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.recipe != null ? 'Edit Recipe' : 'Create Recipe'),
+        centerTitle: true,
+        title: Text(
+          widget.recipe != null ? 'Edit Recipe' : 'Create Recipe',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color.fromRGBO(168, 64, 185, 1),
+                Color.fromRGBO(110, 59, 226, 1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:recipeasy/models/meal_planning.dart';
-import 'package:recipeasy/models/recipe.dart';
-import 'package:recipeasy/models/meal_model.dart';
 
 class SpoonacularService {
   final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65'; //8be11e6b2fdf466bbe400a81c87cfa65  867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b

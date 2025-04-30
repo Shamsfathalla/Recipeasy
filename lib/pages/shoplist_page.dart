@@ -376,113 +376,120 @@ class HistoryShopList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: _historyStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator(color: primaryPurple));
-        }
-        final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
-        if (documents.isEmpty) {
-          return Center(
-            child: Text(
-              'Your history is empty.',
-              style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+  return StreamBuilder<QuerySnapshot>(
+    stream: _historyStream,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Center(child: Text('Error: ${snapshot.error}'));
+      }
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return Center(child: CircularProgressIndicator(color: primaryPurple));
+      }
+      final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
+      if (documents.isEmpty) {
+        return Center(
+          child: Text(
+            'Your history is empty.',
+            style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+          ),
+        );
+      }
+      return ListView.builder(
+        padding: EdgeInsets.all(10.0),
+        itemCount: documents.length,
+        itemBuilder: (context, index) {
+          final doc = documents[index];
+          final data = doc.data() as Map<String, dynamic>;
+          final name = data['name'];
+          final quantity = data['quantity'] ?? 1;
+          final price = data['price'] ?? 0.0; // Retrieve the price from history
+
+          return Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
             ),
-          );
-        }
-        return ListView.builder(
-          padding: EdgeInsets.all(10.0),
-          itemCount: documents.length,
-          itemBuilder: (context, index) {
-            final doc = documents[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final name = data['name'];
-            final quantity = data['quantity'] ?? 1;
-            return Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
+            elevation: 3.0,
+            margin: EdgeInsets.symmetric(vertical: 6.0),
+            color: isDarkMode ? Colors.grey[800] : Colors.white,
+            child: ListTile(
+              title: Text(
+                name,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
               ),
-              elevation: 3.0,
-              margin: EdgeInsets.symmetric(vertical: 6.0),
-              color: isDarkMode ? Colors.grey[800] : Colors.white,
-              child: ListTile(
-                title: Text(
-                  name,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                ),
-                subtitle: Text(
-                  'Quantity: $quantity',
-                  style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                ),
-                leading: Icon(
-                  Icons.history,
-                  color: isDarkMode ? Colors.white : purpleIconColor,
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.add, color: isDarkMode ? Colors.white : purpleIconColor),
-                      onPressed: () async {
-                        final user = FirebaseAuth.instance.currentUser;
-                        if (user == null) return;
-                        final collectionRef = FirebaseFirestore.instance
-                            .collection('users/${user.uid}/shopping_list');
-                        final querySnapshot = await collectionRef.where('name', isEqualTo: name).get();
-                        if (querySnapshot.docs.isNotEmpty) {
-                          final doc = querySnapshot.docs.first;
-                          await collectionRef.doc(doc.id).update({
-                            'quantity': FieldValue.increment(1),
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Incremented "$name" quantity in your shopping list.'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        } else {
-                          await collectionRef.add({
-                            'name': name,
-                            'quantity': quantity,
-                            'addedAt': FieldValue.serverTimestamp(),
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Added "$name" to shopping list'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () async {
-                        await FirebaseFirestore.instance
-                            .collection('users/${FirebaseAuth.instance.currentUser!.uid}/history')
-                            .doc(doc.id)
-                            .delete();
+              subtitle: Text(
+                'Quantity: $quantity\nPrice: \$${(quantity * price).toStringAsFixed(2)}',
+                style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+              ),
+              leading: Icon(
+                Icons.history,
+                color: isDarkMode ? Colors.white : purpleIconColor,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.add, color: isDarkMode ? Colors.white : purpleIconColor),
+                    onPressed: () async {
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user == null) return;
+
+                      final collectionRef = FirebaseFirestore.instance
+                          .collection('users/${user.uid}/shopping_list');
+                      final querySnapshot = await collectionRef.where('name', isEqualTo: name).get();
+
+                      if (querySnapshot.docs.isNotEmpty) {
+                        // If the item already exists in the shopping list, increment its quantity
+                        final doc = querySnapshot.docs.first;
+                        await collectionRef.doc(doc.id).update({
+                          'quantity': FieldValue.increment(quantity),
+                        });
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Removed "$name" from your history.'),
+                            content: Text('Incremented "$name" quantity in your shopping list.'),
                             duration: Duration(seconds: 2),
                           ),
                         );
-                      },
-                    ),
-                  ],
-                ),
+                      } else {
+                        // If the item does not exist, add it back with its price
+                        await collectionRef.add({
+                          'name': name,
+                          'quantity': quantity,
+                          'price': price, // Include the price when adding back
+                          'addedAt': FieldValue.serverTimestamp(),
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added "$name" to shopping list'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () async {
+                      await FirebaseFirestore.instance
+                          .collection('users/${FirebaseAuth.instance.currentUser!.uid}/history')
+                          .doc(doc.id)
+                          .delete();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Removed "$name" from your history.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          );
+        },
+      );
+    },
+  );
   }
 }

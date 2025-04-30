@@ -168,7 +168,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
+    // final isDarkMode = theme.brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: true,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth.dart';
 import '../pages/home_page.dart';
 
@@ -344,14 +343,14 @@ class _LoginPageState extends State<LoginPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Theme.of(context).dialogBackgroundColor,
+            color: Theme.of(context).dialogTheme.backgroundColor,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: (0.2)),
                 blurRadius: 10,
                 offset: const Offset(0, -5),
               ),
@@ -651,14 +650,14 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).dialogBackgroundColor,
+                      color: Theme.of(context).dialogTheme.backgroundColor,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
                         topRight: Radius.circular(20),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: (0.2)),
                           blurRadius: 10,
                           offset: const Offset(0, -5),
                         ),

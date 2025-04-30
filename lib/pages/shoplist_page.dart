@@ -28,8 +28,8 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
         checkboxTheme: CheckboxThemeData(
-          fillColor: MaterialStateProperty.resolveWith<Color>((states) {
-            if (states.contains(MaterialState.selected)) {
+          fillColor: WidgetStateProperty.resolveWith<Color>((states) {
+            if (states.contains(WidgetState.selected)) {
               return primaryPurple;
             }
             return Colors.grey;
@@ -49,8 +49,8 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
         checkboxTheme: CheckboxThemeData(
-          fillColor: MaterialStateProperty.resolveWith<Color>((states) {
-            if (states.contains(MaterialState.selected)) {
+          fillColor: WidgetStateProperty.resolveWith<Color>((states) {
+            if (states.contains(WidgetState.selected)) {
               return primaryPurple;
             }
             return Colors.grey;
@@ -194,9 +194,11 @@ class _ShopListPageState extends State<ShopListPage> with SingleTickerProviderSt
           );
         }
       } else {
+        final double defaultPrice = 0.0;
         await collectionRef.add({
           'name': ingredient,
           'quantity': 1,
+          'price': defaultPrice,
           'addedAt': FieldValue.serverTimestamp(),
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -258,6 +260,7 @@ class _CurrentShopListState extends State<CurrentShopList> {
             final data = doc.data() as Map<String, dynamic>;
             final name = data['name'];
             final quantity = data['quantity'] ?? 1;
+            final price = data['price'] ?? 0.0;
             return Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12.0),
@@ -271,7 +274,7 @@ class _CurrentShopListState extends State<CurrentShopList> {
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                 ),
                 subtitle: Text(
-                  'Quantity: $quantity',
+                  'Quantity: $quantity\nPrice: \$${(quantity * price).toStringAsFixed(2)}',
                   style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
                 ),
                 leading: Checkbox(
@@ -287,6 +290,7 @@ class _CurrentShopListState extends State<CurrentShopList> {
                           .add({
                         'name': name,
                         'quantity': quantity,
+                        'price': price,
                         'addedAt': FieldValue.serverTimestamp(),
                       });
                       await FirebaseFirestore.instance

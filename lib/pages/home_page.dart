@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:recipeasy/pages/recipe_details.dart';
 import 'package:recipeasy/pages/user_recipe_details_page.dart';
-import '/auth.dart';
 import '/pages/profile_page.dart';
 import '/pages/shoplist_page.dart';
 import '/pages/my_recipes_page.dart';
@@ -10,7 +9,6 @@ import '/pages/meal_plans_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/spoonacular_api';
-import '../services/recipe_folder_service.dart';
 import 'dart:math';
 
 class HomePage extends StatefulWidget {
@@ -20,7 +18,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final Auth _auth = Auth();
   int _selectedIndex = 0;
   final SpoonacularService _spoonacularService = SpoonacularService();
   final TextEditingController _searchController = TextEditingController();

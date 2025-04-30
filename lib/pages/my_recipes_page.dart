@@ -3,10 +3,8 @@ import 'package:recipeasy/models/recipe_model.dart';
 import 'package:recipeasy/services/recipe_folder_service.dart';
 import 'package:recipeasy/services/spoonacular_api';
 import 'package:recipeasy/pages/recipe_details.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'create_recipe_page.dart';
 import 'package:recipeasy/pages/user_recipe_details_page.dart';
-import 'package:recipeasy/services/analytics_service.dart';
 
 // Color constants
 final Color lightPurple = Color.fromARGB(255, 234, 221, 255); // Light purple shade
@@ -21,8 +19,6 @@ class MyRecipesPage extends StatefulWidget {
 class _MyRecipesPageState extends State<MyRecipesPage> {
   final RecipeFolderService _folderService = RecipeFolderService();
   final SpoonacularService _spoonacularService = SpoonacularService();
-  final AnalyticsService _analyticsService = AnalyticsService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final GlobalKey<_BookmarksPageState> _bookmarksPageKey = GlobalKey<_BookmarksPageState>();
   List<Recipe> _userRecipes = [];
 
@@ -585,9 +581,9 @@ class _BookmarksPageState extends State<BookmarksPage> {
                         }
                       },
                       backgroundColor: _selectedFolderId == 'general'
-                          ? primaryPurple.withOpacity(0.2)
-                          : primaryPurple.withOpacity(0.1),
-                      selectedColor: primaryPurple.withOpacity(0.4),
+                          ? primaryPurple.withValues(alpha: (0.2))
+                          : primaryPurple.withValues(alpha: (0.1)),
+                      selectedColor: primaryPurple.withValues(alpha: (0.4)),
                       labelStyle: TextStyle(
                         color: _selectedFolderId == 'general'
                             ? primaryPurple
@@ -611,9 +607,9 @@ class _BookmarksPageState extends State<BookmarksPage> {
                         }
                       },
                       backgroundColor: _selectedFolderId == folder['id']
-                          ? primaryPurple.withOpacity(0.2)
-                          : primaryPurple.withOpacity(0.1),
-                      selectedColor: primaryPurple.withOpacity(0.4),
+                          ? primaryPurple.withValues(alpha: (0.2))
+                          : primaryPurple.withValues(alpha: (0.1)),
+                      selectedColor: primaryPurple.withValues(alpha : (0.4)),
                       labelStyle: TextStyle(
                         color: _selectedFolderId == folder['id']
                             ? primaryPurple
@@ -674,7 +670,7 @@ class _BookmarksPageState extends State<BookmarksPage> {
               itemCount: _recipes.length,
               itemBuilder: (context, index) {
                 final recipe = _recipes[index];
-                final recipeId = recipe['recipeId'];
+                // final recipeId = recipe['recipeId'];
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                   child: ListTile(

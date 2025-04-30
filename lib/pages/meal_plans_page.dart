@@ -4,7 +4,6 @@ import 'package:recipeasy/services/Spoonacular_APi';
 import 'package:recipeasy/models/meal_planning.dart';
 import 'package:recipeasy/theme_provider.dart';
 import 'package:recipeasy/pages/recipe_details.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'meal_details.dart';
 
@@ -80,8 +79,18 @@ class _MealPlansPageState extends State<MealPlansPage> {
         excludeIngredients: '',
       );
 
+      double totalCost = 0.0;
+
+      for (var meal in mealPlan.meals) {
+        if (meal.id != null) {
+          final priceBreakdown = await _spoonacularService.getRecipePriceBreakdown(meal.id!);
+          totalCost += priceBreakdown['totalCost'] ?? 0.0;
+        }
+      }
+
       setState(() {
         _mealPlan = mealPlan;
+        _mealPlan!.totalCost = totalCost; // Add total cost to the meal plan
         _isLoading = false;
         _isRefreshing = false;
       });
@@ -188,10 +197,17 @@ class _MealPlansPageState extends State<MealPlansPage> {
                   'Fat: ${_mealPlan!.fat.round()}g',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: isDarkMode
-                    ? colorScheme.onSurface.withOpacity(0.8)
+                    ? colorScheme.onSurface.withValues(alpha: (0.8))
                     : Colors.grey[700],
               ),
             ),
+            Text(
+          'Total Cost: \$${_mealPlan!.totalCost.toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? colorScheme.onSurface : Colors.black,
+          ),
+        ),
             const SizedBox(height: 16),
             ..._buildMealPlanList(isDarkMode, colorScheme),
           ],
@@ -207,7 +223,7 @@ class _MealPlansPageState extends State<MealPlansPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         margin: const EdgeInsets.symmetric(vertical: 6.0),
         color: isDarkMode
-            ? colorScheme.surfaceVariant.withOpacity(0.3)
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: (0.3))
             : Colors.grey[200],
         child: InkWell(
           borderRadius: BorderRadius.circular(12.0),

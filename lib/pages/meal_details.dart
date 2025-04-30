@@ -174,7 +174,7 @@ class _MealDetailsPageState extends State<MealDetailsPage> {
                 'Set your minimum daily targets',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: isDarkMode
-                      ? colorScheme.onSurface.withOpacity(0.7)
+                      ? colorScheme.onSurface.withValues(alpha: (0.7))
                       : Colors.grey[600],
                 ),
               ),

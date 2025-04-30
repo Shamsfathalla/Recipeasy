@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '/theme_provider.dart';
 import '../pages/login_register_page.dart';
-import '/services/firestore_services.dart';
 import '../pages/privacy_policy_page.dart';
 import '../pages/terms_of_service_page.dart';
 import '../pages/help_faq_page.dart';
@@ -227,6 +226,9 @@ class SettingsPage extends StatelessWidget {
           const SnackBar(content: Text('Password updated successfully!')),
         );
       } on FirebaseAuthException catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update password: ${e.message}')),
+        );
         // This shouldn't happen since we validated in the dialog
       }
     }
@@ -350,10 +352,17 @@ class SettingsPage extends StatelessWidget {
                       'newPassword': newPassword,
                     });
                   } on FirebaseAuthException catch (e) {
-                    setState(() {
-                      isLoading = false;
-                      errorMessage = 'Current password is incorrect';
-                    });
+                    if (e.code == 'wrong-password') {
+                      setState(() {
+                        isLoading = false;
+                        errorMessage = 'Current password is incorrect';
+                      });
+                      return;
+                    }
+                    // setState(() {
+                    //   isLoading = false;
+                    //   errorMessage = 'Current password is incorrect';
+                    // });
                   } catch (e) {
                     setState(() {
                       isLoading = false;
@@ -396,21 +405,20 @@ class SettingsPage extends StatelessWidget {
     if (result == null || !result['valid']) return;
 
     final newUsername = result['username'] as String;
-    final password = result['password'] as String;
 
     try {
-      final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Updating username...'),
-            ],
-          ),
-          duration: Duration(seconds: 10),
-        ),
-      );
+      // final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(
+      //     content: Row(
+      //       children: [
+      //         CircularProgressIndicator(),
+      //         SizedBox(width: 20),
+      //         Text('Updating username...'),
+      //       ],
+      //     ),
+      //     duration: Duration(seconds: 10),
+      //   ),
+      // );
 
       final batch = FirebaseFirestore.instance.batch();
 
@@ -561,10 +569,12 @@ class _UsernameChangeDialogState extends State<UsernameChangeDialog> {
         'valid': true
       });
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _passwordError = 'Incorrect password';
-        _isVerifying = false;
-      });
+      if (e.code == 'wrong-password') {
+        setState(() {
+          _passwordError = 'Incorrect password';
+        });
+        return;
+      }
     } catch (e) {
       setState(() {
         _passwordError = 'Error verifying password';

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_profile_page.dart';
-import 'package:recipeasy/pages/user_recipe_details_page.dart';
-import 'package:recipeasy/services/analytics_service.dart';
 
 final RouteObserver<ModalRoute> routeObserver = RouteObserver<ModalRoute>();
 
@@ -26,7 +24,6 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
   List<String> dietaryRequirements = [];
   List<String> allergies = [];
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final AnalyticsService _analyticsService = AnalyticsService();
 
   @override
   void initState() {
@@ -570,7 +567,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: (0.1)),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -639,7 +636,7 @@ class _ProfilePageState extends State<ProfilePage> with RouteAware {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Color.fromARGB(255, 110, 59, 226).withOpacity(0.2),
+            color: Color.fromARGB(255, 110, 59, 226).withValues(alpha: (0.2)),
             shape: BoxShape.circle,
           ),
           child: Icon(

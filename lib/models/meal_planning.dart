@@ -6,6 +6,7 @@ class MealPlan {
   final double carbs;
   final double fat;
   final double protein;
+  double totalCost;
 
   MealPlan({
     required this.meals,
@@ -13,6 +14,7 @@ class MealPlan {
     required this.carbs,
     required this.fat,
     required this.protein,
+    this.totalCost = 0.0,
   });
 
   factory MealPlan.fromMap(Map<String, dynamic> map) {

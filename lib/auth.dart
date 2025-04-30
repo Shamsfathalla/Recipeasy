@@ -81,6 +81,12 @@ class Auth {
       return 'Account created successfully! Please sign in to continue.';
     } on FirebaseAuthException catch (e) {
       // Re-throw Firebase auth exceptions
+      if (e.code == 'email-already-in-use') {
+        throw FirebaseAuthException(
+          code: 'email-already-in-use',
+          message: 'Email is already in use',
+        );
+      }
       rethrow;
     } catch (e) {
       // Convert other exceptions to FirebaseAuthException for consistency
@@ -103,6 +109,24 @@ class Auth {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No user found for that email',
+        );
+      }
+      if (e.code == 'invalid-email') {
+        throw FirebaseAuthException(
+          code: 'invalid-email',
+          message: 'Invalid email address',
+        );
+      }
+      if (e.code == 'operation-not-allowed') {
+        throw FirebaseAuthException(
+          code: 'operation-not-allowed',
+          message: 'Email/password accounts are not enabled',
+        );
+      }
       rethrow;
     }
   }

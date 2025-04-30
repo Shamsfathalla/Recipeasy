@@ -57,27 +57,6 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     _newFolderController.dispose();
     super.dispose();
   }
-
-  Future<void> _fetchRecipeDetails() async {
-    try {
-      final details = await _spoonacularService.getRecipeDetails(widget.recipeId);
-      if (mounted) {
-        setState(() {
-          _recipeDetails = details;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-      debugPrint('Error fetching recipe details: $e');
-    }
-  }
-
   Future<void> _loadFolders() async {
     final folders = await _folderService.getUserFolders();
     setState(() {
@@ -310,7 +289,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: (0.1)),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -368,8 +347,44 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
       ),
     );
   }
+  Future<void> _fetchRecipeDetails() async {
+    try {
+      final details = await _spoonacularService.getRecipeDetails(widget.recipeId);
+      final priceBreakdown = await _spoonacularService.getRecipePriceBreakdown(widget.recipeId);
 
-  Widget _buildIngredientItem(String ingredient) {
+      if (mounted) {
+        setState(() {
+          _recipeDetails = details;
+
+          // Merge price data into extendedIngredients
+          if (priceBreakdown['ingredients'] != null) {
+            final ingredientPrices = Map.fromIterable(
+              priceBreakdown['ingredients'],
+              key: (item) => item['name'].toLowerCase(), // Match by ingredient name (case-insensitive)
+              value: (item) => item['price'] ?? 0.0, // Price in dollars
+            );
+
+            for (var ingredient in _recipeDetails!['extendedIngredients']) {
+              final ingredientName = ingredient['name'].toLowerCase();
+              ingredient['price'] = ingredientPrices[ingredientName] ?? 0.0;
+            }
+          }
+
+          _recipeDetails!['totalCost'] = priceBreakdown['totalCost'] ?? 0.0;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+        });
+      }
+      debugPrint('Error fetching recipe details: $e');
+    }
+  }
+  Widget _buildIngredientItem(String ingredient, double price) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -388,7 +403,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              _addIngredientToShoppingList(ingredient);
+              _addIngredientToShoppingList(ingredient,price);
             },
           ),
         ],
@@ -396,7 +411,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     );
   }
 
-  Future<void> _addIngredientToShoppingList(String ingredient) async {
+  Future<void> _addIngredientToShoppingList(String ingredient, double price) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -418,6 +433,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         final doc = querySnapshot.docs.first;
         await collectionRef.doc(doc.id).update({
           'quantity': FieldValue.increment(1),
+          'price': price,
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -431,6 +447,7 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
         await collectionRef.add({
           'name': ingredient,
           'quantity': 1,
+          'price': price,
           'addedAt': FieldValue.serverTimestamp(),
         });
         if (mounted) {
@@ -487,7 +504,9 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
       children: [
         _buildSectionTitle('Ingredients'),
         ..._recipeDetails!['extendedIngredients']
-            .map<Widget>((ingredient) => _buildIngredientItem(ingredient['original']))
+            .map<Widget>((ingredient) => _buildIngredientItem(
+              ingredient['original'],
+              ingredient['price'] ?? 'No Price found',))
             .toList(),
       ],
     );
@@ -543,57 +562,57 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
     );
   }
 
-  Widget _buildNutritionSection() {
-    if (_recipeDetails!['nutrition'] == null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle('Nutrition Information'),
-          _buildTextContent('No nutrition information available.'),
-        ],
-      );
-    }
-    final nutrition = _recipeDetails!['nutrition'];
-    final nutrients = nutrition['nutrients'] as List<dynamic>?;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Nutrition Information'),
-        if (nutrients == null || nutrients.isEmpty)
-          _buildTextContent('No nutrition data available.')
-        else
-          Column(
-            children: nutrients.map((nutrient) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        nutrient['name'],
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 1,
-                      child: Text(
-                        '${nutrient['amount']?.toStringAsFixed(1) ?? 'N/A'} ${nutrient['unit'] ?? ''}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.end,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-      ],
-    );
-  }
+  // Widget _buildNutritionSection() {
+  //   if (_recipeDetails!['nutrition'] == null) {
+  //     return Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         _buildSectionTitle('Nutrition Information'),
+  //         _buildTextContent('No nutrition information available.'),
+  //       ],
+  //     );
+  //   }
+  //   final nutrition = _recipeDetails!['nutrition'];
+  //   final nutrients = nutrition['nutrients'] as List<dynamic>?;
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       _buildSectionTitle('Nutrition Information'),
+  //       if (nutrients == null || nutrients.isEmpty)
+  //         _buildTextContent('No nutrition data available.')
+  //       else
+  //         Column(
+  //           children: nutrients.map((nutrient) {
+  //             return Padding(
+  //               padding: const EdgeInsets.symmetric(vertical: 6),
+  //               child: Row(
+  //                 children: [
+  //                   Expanded(
+  //                     flex: 2,
+  //                     child: Text(
+  //                       nutrient['name'],
+  //                       style: const TextStyle(fontSize: 16),
+  //                     ),
+  //                   ),
+  //                   Expanded(
+  //                     flex: 1,
+  //                     child: Text(
+  //                       '${nutrient['amount']?.toStringAsFixed(1) ?? 'N/A'} ${nutrient['unit'] ?? ''}',
+  //                       style: const TextStyle(
+  //                         fontSize: 16,
+  //                         fontWeight: FontWeight.w500,
+  //                       ),
+  //                       textAlign: TextAlign.end,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             );
+  //           }).toList(),
+  //         ),
+  //     ],
+  //   );
+  // }
 
   Widget _buildCurrentSection() {
     if (_recipeDetails == null) return const SizedBox();
@@ -724,6 +743,22 @@ class _RecipeDetailsPageState extends State<RecipeDetailsPage> {
                 ],
               ),
             ),
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Price: \$${_recipeDetails!['totalCost'].toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(

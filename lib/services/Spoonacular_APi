@@ -6,7 +6,7 @@ import 'package:recipeasy/models/recipe.dart';
 import 'package:recipeasy/models/meal_model.dart';
 
 class SpoonacularService {
-  final String _apiKey = '4ec0a5012ea2487d87d999e1cacd916b'; //8be11e6b2fdf466bbe400a81c87cfa65  867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b
+  final String _apiKey = '8be11e6b2fdf466bbe400a81c87cfa65'; //8be11e6b2fdf466bbe400a81c87cfa65  867c8584a6b2463ca4f842516e4c334d 64fffd0b3d124015bf4be97aefd2936b
   final String _baseUrl = 'https://api.spoonacular.com';
   Future<List<dynamic>> searchRecipes(String query, {int page = 1, List<String>? dietaryRequirements, List<String>? allergies, int? maxCookingTime}) async {
     String dietQuery = '';
@@ -65,6 +65,32 @@ class SpoonacularService {
         return data;
       } else {
         throw Exception('Failed to fetch recipes by ingredients: ${response.statusCode}');
+      }
+    }
+    Future<Map<String, dynamic>> getRecipePriceBreakdown(int recipeId) async {
+      final url = Uri.parse('$_baseUrl/recipes/$recipeId/priceBreakdownWidget.json?apiKey=$_apiKey');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        // Convert total cost from cents to dollars
+        if (data['totalCost'] != null) {
+          data['totalCost'] = (data['totalCost'] / 100.0);
+        }
+
+        // Convert each ingredient's cost from cents to dollars
+        if (data['ingredients'] != null) {
+          for (var ingredient in data['ingredients']) {
+            if (ingredient['price'] != null) {
+              ingredient['price'] = ingredient['price'] / 100.0;
+            }
+          }
+        }
+
+        return data;
+      } else {
+        throw Exception('Failed to fetch recipe price breakdown: ${response.statusCode}');
       }
     }
 

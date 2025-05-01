@@ -274,7 +274,9 @@ class _CurrentShopListState extends State<CurrentShopList> {
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                 ),
                 subtitle: Text(
-                  'Quantity: $quantity\nPrice: \$${(quantity * price).toStringAsFixed(2)}',
+                  price == null || price == 0.0
+                  ? 'Quantity: $quantity\nPrice: Price not found' // Display "Price not found"
+                  : 'Quantity: $quantity\nPrice: \$${(quantity * price).toStringAsFixed(2)}',
                   style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
                 ),
                 leading: Checkbox(

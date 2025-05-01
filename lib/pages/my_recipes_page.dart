@@ -249,13 +249,11 @@ class _BookmarksPageState extends State<BookmarksPage> {
           Map<String, dynamic>? details;
           if (recipeId is int) {
             details = await widget.spoonacularService.getRecipeDetails(recipeId);
-            if (details != null) {
-              apiRecipes.add({
-                ...details,
-                'docId': doc['id'],
-                'folderId': folderId,
-              });
-            }
+            apiRecipes.add({
+              ...details,
+              'docId': doc['id'],
+              'folderId': folderId,
+            });
           } else if (recipeId is String) {
             details = await widget.folderService.getUserRecipeDetails(recipeId);
             if (details != null) {
